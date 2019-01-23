@@ -84,8 +84,7 @@ class MemoryCoreTester(ResetTester, ConfigurationTester):
         self.functional_model.read_and_write(addr, data)
         self.eval()
 
-
-def test_sram_basic():
+def set_up_tester():
     generator = memory_core_genesis2.memory_core_wrapper.generator(
         param_mapping=memory_core_genesis2.param_mapping)
     Mem = generator()  # Using default params
@@ -111,14 +110,23 @@ def test_sram_basic():
 
     tester.poke(Mem.clk_en, 1)
 
+    return tester
+
+
+def reconfigure_mode(tester, mode):
     tester.reset()
 
-    mode = Mode.SRAM
     tile_enable = 1
     depth = 8
     config_data = mode.value | (tile_enable << 2) | (depth << 3)
     config_addr = BitVector(0, 32)
     tester.configure(config_addr, BitVector(config_data, 32))
+
+def test_sram_basic():
+    tester = set_up_tester()
+
+    reconfigure_mode(tester, Mode.SRAM)
+
     num_writes = 20
     memory_size = 1024
 
@@ -153,3 +161,20 @@ def test_sram_basic():
                            magma_output="verilog",
                            target="verilator",
                            flags=["-Wno-fatal"])
+
+def test_fifo_basic():
+    tester = set_up_tester()
+    reconfigure_mode(tester, Mode.FIFO)
+
+    tester.write(0, 42)
+    tester.write(0, 100)
+    tester.read(0)
+    tester.read(0)
+
+    tester.compile_and_run(directory="test_memory_core/build",
+                           magma_output="verilog",
+                           target="verilator",
+                           flags=["-Wno-fatal"])
+
+
+
