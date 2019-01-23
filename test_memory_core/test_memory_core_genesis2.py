@@ -163,13 +163,40 @@ def test_sram_basic():
                            flags=["-Wno-fatal"])
 
 def test_fifo_basic():
+    # TODO this is defined several times in this file
+    memory_size = 1024
+
     tester = set_up_tester()
     reconfigure_mode(tester, Mode.FIFO)
 
-    tester.write(0, 42)
-    tester.write(0, 100)
-    tester.read(0)
-    tester.read(0)
+    num_writes = memory_size*3
+
+    fifo_count = 0
+    op_count = 0
+
+    while op_count < num_writes:
+        if fifo_count == 0:
+            tester.write(0, random.randint(0, memory_size-1))
+            fifo_count += 1
+        elif fifo_count == memory_size:
+            tester.read(0)
+            fifo_count -= 1
+        else:
+            if random.randint(0, 3) == 0:
+                tester.read(0)
+                fifo_count -= 1
+            else:
+                tester.write(0, random.randint(0, memory_size-1))
+                fifo_count += 1
+        op_count += 1
+
+
+    while fifo_count > 0:
+        tester.read(0)
+        fifo_count -= 1
+
+    # TODO: If we define a behavior, make sure to test reading from empty and writing to full
+
 
     tester.compile_and_run(directory="test_memory_core/build",
                            magma_output="verilog",
