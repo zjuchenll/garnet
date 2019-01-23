@@ -58,6 +58,9 @@ def gen_memory_core(data_width: int, data_depth: int):
             self.config[addr] = data
 
         def reset(self):
+            self.fifo_oldest = 0
+            self.fifo_count = 0
+
             address_width = m.bitutils.clog2(data_depth)
             self.memory = Memory(address_width, data_width)
             self.data_out = fault.UnknownValue
@@ -76,12 +79,27 @@ def gen_memory_core(data_width: int, data_depth: int):
         def read(self, addr):
             if self.__mode == Mode.SRAM:
                 self.data_out = self.memory.read(addr)
+            elif self.__mode == Mode.FIFO:
+                if self.fifo_count == 0:
+                    # TODO: I think deciding on a behavior and testing it is better than asserting false
+                    assert self.fifo_count > 0, \
+                            "Cannot pop from empty fifo"
+                self.data_out = self.memory.read(self.fifo_oldest)
+                self.fifo_count -= 1
+                self.fifo_oldest = (self.fifo_oldest + 1) % data_depth
             else:
                 raise NotImplementedError(self.__mode)  # pragma: nocover
 
         def write(self, addr, data):
             if self.__mode == Mode.SRAM:
                 self.memory.write(addr, data)
+            elif self.__mode == Mode.FIFO:
+                if self.fifo_count == data_depth:
+                    # TODO: I think deciding on a behavior and testing it is better than asserting false
+                    assert self.fifo_count < data_depth, \
+                            f"Cannot push to full fifo, already contains {self.fifo_count} elements"
+                self.memory.write((self.fifo_oldest + self.fifo_count) % data_depth, data)
+                self.fifo_count += 1
             else:
                 raise NotImplementedError(self.__mode)  # pragma: nocover
 
