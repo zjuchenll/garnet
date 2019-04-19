@@ -1,0 +1,56 @@
+///////////////////////////////////////////////////////////////////
+// CGRA Memory generator - Memory wrapper
+/////////////////////////////////////////////////////////////////
+//; my $dwidth   = parameter(Name=>'dwidth', val=> 64, doc=>'data width of instantitated memory');
+//; my $awidth   = parameter(Name=>'awidth', val=> 8, doc=>'address bus width of instantitated memory');
+//; my $wwidth   = parameter(Name=>'wwidth', val=> 16, doc=>'width of word');
+//; my $numwords = $dwidth/$wwidth;
+
+module `mname` (
+  data_out, 
+  data_in,
+  clk,
+  cen,
+  wen,
+  addr,
+  pw_sel
+);
+
+output [`$dwidth-1`:0] data_out;
+input [`$dwidth-1`:0] data_in;
+input clk;
+input cen;
+input wen;
+input [`$awidth-1`:0] addr;
+input [`$numwords-1`:0] pw_sel;
+
+wire clk_d;
+assign #0.1 clk_d = clk;
+
+wire [`$wwidth-1`: 0] const_word;
+wire [`$wwidth-1`: 0] const_zero;
+assign const_word = ~0;
+assign const_zero = 0;
+
+wire [`$dwidth-1`:0] sel_mask;
+
+assign sel_mask = {
+//; for(my $j = 0; $j < $numwords; $j++) {
+	((pw_sel[`$j`] ? const_word : const_zero) << (`$j*$wwidth`)),
+//; }
+}
+
+// Instance of mem module
+TS1N16FFCLLSBLVTC256X64M4SW (
+  .CLK(clk), // Clock - 1
+  .CEB(cen), // Chip Enable (low) - 1
+  .WEB(wen), // Write Enable (low) - 1
+  .A(addr), 
+  .D(data_in),
+  .BWEB(sel_mask),
+  .Q(data_out),
+  .RTSEL(2'b00),
+  .WTSEL(2'b00)
+  );
+
+endmodule
