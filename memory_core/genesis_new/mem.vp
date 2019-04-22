@@ -1,10 +1,16 @@
 ///////////////////////////////////////////////////////////////////
-// CGRA Memory generator - Memory wrapper
+// CGRA Memory Wrapper
+// Author: Maxwell Strange
 /////////////////////////////////////////////////////////////////
+//;    use POSIX;
+//;    my $backtick = "`";
+`$backtick`define xassert(condition, message) if(condition) begin $display(message); $finish(1); end
+
 //; my $dwidth   = parameter(Name=>'dwidth', val=> 64, doc=>'data width of instantitated memory');
-//; my $awidth   = parameter(Name=>'awidth', val=> 8, doc=>'address bus width of instantitated memory');
+//; my $ddepth   = parameter(Name=>'ddepth', val=> 256, doc=>'num words in memory');
 //; my $wwidth   = parameter(Name=>'wwidth', val=> 16, doc=>'width of word');
-//; my $numwords = $dwidth/$wwidth;
+//; my $numwords = int($dwidth/$wwidth);
+//; my $awidth = int(ceil(log($ddepth)/log(2))) + int(ceil(log($numwords)/log(2)));
 
 module `mname` (
   data_out, 
@@ -16,8 +22,8 @@ module `mname` (
   pw_sel
 );
 
-output [`$dwidth-1`:0] data_out;
-input [`$dwidth-1`:0] data_in;
+output [`$wwidth-1`:0] data_out;
+input [`$wwidth-1`:0] data_in;
 input clk;
 input cen;
 input wen;
@@ -33,12 +39,21 @@ assign const_word = ~0;
 assign const_zero = 0;
 
 wire [`$dwidth-1`:0] sel_mask;
+wire [`$dwidth-1`:0] full_mem_out;
+
+
+assign data_out = 
+//; for(my $j = $numwords-1; $j > 0; $j--) {
+	pw_sel[`$j`] ? full_mem_out[`($j+1)*$wwidth-1`:`$j*$wwidth`] :
+//; }
+	full_mem_out[`$wwidth-1`:0];
 
 assign sel_mask = {
-//; for(my $j = 0; $j < $numwords; $j++) {
-	((pw_sel[`$j`] ? const_word : const_zero) << (`$j*$wwidth`)),
+//; for(my $j = $numwords-1; $j > 0; $j--) {
+	(pw_sel[`$j`] ? const_word : const_zero),
 //; }
-}
+	(pw_sel[0] ? const_word : const_zero)
+	};
 
 // Instance of mem module
 TS1N16FFCLLSBLVTC256X64M4SW (
@@ -48,7 +63,7 @@ TS1N16FFCLLSBLVTC256X64M4SW (
   .A(addr), 
   .D(data_in),
   .BWEB(sel_mask),
-  .Q(data_out),
+  .Q(full_mem_out),
   .RTSEL(2'b00),
   .WTSEL(2'b00)
   );

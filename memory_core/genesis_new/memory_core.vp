@@ -3,15 +3,14 @@
 ///////////////////////////////////////////////////////////////////
 // CGRA memory generator
 //////////////////////////////////////////////////////////////////
-
-
 `$backtick`define xassert(condition, message) if(condition) begin $display(message); $finish(1); end
 
-
-//; my $dwidth   = parameter(Name=>'dwidth', val=> 16, doc=>'word width');
+//; my $dwidth   = parameter(Name=>'dwidth', val=> 64, doc=>'word width');
+//; my $bbanks   = parameter(Name=>'bbanks', val=> 2, doc=>'Number of Banks');
 //; my $ddepth   = parameter(Name=>'ddepth', val=> 1024, doc=>'number of words in the memory');
-
-//; my $awidth = int(ceil(log($ddepth)/log(2)));
+//; my $wwidth   = parameter(Name=>'wwidth', val=> 16, doc=>'width of item');
+//; my $numwords = int($dwidth/$wwidth);
+//; my $awidth = int(ceil(log($ddepth)/log(2))) + int(ceil(log($numwords)/log(2)));
 
 module `mname`(
 clk_in,
@@ -267,8 +266,6 @@ assign mem_cen0 = mem_cen0_int & (mem_wen0 | mem_ren0);
 assign mem_cen1 = mem_cen1_int & (mem_wen1 | mem_ren1);
 
 
-//; my $lb = generate('linebuffer_control', 'linebuffer_control', dwidth => $dwidth, ddepth => $ddepth );
-//; my $fifo = generate('fifo_control', 'fifo_control', dwidth => $dwidth, ddepth => $ddepth );
 always @(*) begin
         case (config_addr[31:24])
             8'd0 : read_data = config_mem[31:0];
@@ -276,6 +273,7 @@ always @(*) begin
         endcase
     end
 
+//; my $lb = generate('linebuffer_control', 'linebuffer_control', dwidth => $dwidth, ddepth => $ddepth );
 `$lb->instantiate()`
 (
 .clk(gclk),
@@ -288,7 +286,7 @@ always @(*) begin
 .data_in(data_in_int),
 .wen(wen_in_int),
 .data_out(lb_out),
-.stall_read(1'b0),
+.stall_read(0),
 .valid(lb_valid_out),
 .almost_full(lb_almost_full),
 .almost_empty(lb_almost_empty),
@@ -302,57 +300,51 @@ always @(*) begin
 .read_data(read_data_linebuf)
 );
 
-`$fifo->instantiate()`
+
+
+//; my $fifo = generate('fifo_control', 'fifo_control', dwidth => $dwidth, ddepth => $ddepth );
+` $fifo->instantiate()`
 (
 .clk(gclk),
+.clk_en(1),
 .reset(reset),
 .flush(flush),
-.data_in(data_in_int),
+.ren(ren_in),
 .wen(wen_in_int),
+.data_in(data_in_int),
 .data_out(fifo_out),
-.stall_read(ren_in),
-.valid(fifo_valid_out),
-.almost_full(fifo_almost_full),
 .almost_empty(fifo_almost_empty),
-.almost_count(almost_count),
-.depth(depth),
-.addr_to_mem(fifo_addr),
-.data_to_mem(fifo_mem_data_out),
-.data_from_mem({mem_data_out1,mem_data_out0}),
-.wen_to_mem(fifo_wen),
-.ren_to_mem(fifo_ren)
+.almost_full(fifo_almost_full),
+.empty(),
+.full(),
+.fifo_to_mem_data(fifo_mem_data_out),
+.fifo_to_mem_cen(),
+.fifo_to_mem_wen(),
+.fifo_to_mem_addr(),
+.mem_to_fifo_data(0)
 );
 
-//; my $mem = generate('mem', 'mem', dwidth => $dwidth, awidth => ($awidth-1) );
-//; my $mem_obj = clone($mem, 'mem_inst0');
+
+
+//; my $mem = generate('mem', 'mem', dwidth => $dwidth, ddepth => $ddepth, wwidth=> $wwidth);
+
+//; for (my $i = 0; $i < $bbanks; $i++){
+
+//; my $mem_obj = clone($mem, 'mem_inst' . $i);
 `$mem_obj->instantiate()`
 (
-.data_out(mem_data_out0),
-.data_in(mem_data_in0),
+.data_out(`'mem_data_out' . $i`),
+.data_in(`'mem_data_in' . $i`),
 .clk(gclk_sram),
-.cen(mem_cen0),
-.wen(mem_wen0),
-.addr(mem_addr[`$awidth - 2`:0])
+.cen(`'mem_cen' . $i`),
+.wen(`'mem_wen' . $i`),
+.addr(mem_addr[`$awidth - 2`:0]),
+.pw_sel(0)
 );
 
-//; my $mem_obj = clone($mem, 'mem_inst1');
-`$mem_obj->instantiate()`
-(
-.data_out(mem_data_out1),
-.data_in(mem_data_in1),
-.clk(gclk_sram),
-.cen(mem_cen1),
-.wen(mem_wen1),
-.addr(mem_addr[`$awidth - 2`:0])
-);
+
+//; }
+
+
 endmodule
-
-//;my $filename = "MEM".$self->mname();
-//;open(MEMINFO, ">$filename") or die "Couldn't open file $filename, $!";
-//;print MEMINFO "       <mode bith='1' bitl='0'>00</mode>\n";
-//;print MEMINFO "       <tile_en bith='2' bitl='2'>0</tile_en>\n";
-//;print MEMINFO "       <depth bith='15' bitl='3'>0</depth>\n";
-//;print MEMINFO "       <almost_count bith='19' bitl='16'>0</almost_count>\n";
-//;print MEMINFO "       <chain_enable bith='20' bitl='20'>0</chain_enable>\n";
-//; close MEMINFO;
 
