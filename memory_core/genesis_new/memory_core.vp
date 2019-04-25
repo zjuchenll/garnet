@@ -1,129 +1,119 @@
 //;    use POSIX;
 //;    my $backtick = "`";
-///////////////////////////////////////////////////////////////////
-// CGRA memory generator
-//////////////////////////////////////////////////////////////////
+// ========================================================
+// CGRA memory core
+// ========================================================
 `$backtick`define xassert(condition, message) if(condition) begin $display(message); $finish(1); end
 
 //; my $dwidth   = parameter(Name=>'dwidth', val=> 64, doc=>'word width');
 //; my $bbanks   = parameter(Name=>'bbanks', val=> 2, doc=>'Number of Banks');
-//; my $ddepth   = parameter(Name=>'ddepth', val=> 1024, doc=>'number of words in the memory');
+//; my $ddepth   = parameter(Name=>'ddepth', val=> 128, doc=>'number of words in the memory');
 //; my $wwidth   = parameter(Name=>'wwidth', val=> 16, doc=>'width of item');
 //; my $numwords = int($dwidth/$wwidth);
 //; my $awidth = int(ceil(log($ddepth)/log(2))) + int(ceil(log($numwords)/log(2)));
+//; my $bank_addr_width = int(ceil(log($bbanks)/log(2)));
+//; my $num_sram_reads = int(ceil(($numwords * $ddepth * $bbanks)/256));
+//; my $width_sram_reads = int(ceil(log($num_sram_reads)));
+//; my $sets_per_sram = ($numwords * $ddepth)/256;
 
+
+// ========================================================
+// Module Definition
+// ========================================================
 module `mname`(
-clk_in,
-clk_en,
-reset,
-config_addr,
-config_data,
-config_read,
-config_write,
-config_en,
-config_en_sram,
-config_en_linebuf,
-data_in,
-data_out,
-wen_in,
-ren_in,
-valid_out,
-chain_in,
-chain_out,
-chain_wen_in,
-chain_valid_out,
-almost_full,
-almost_empty,
-addr_in,
-read_data,
-read_data_sram_0,
-read_data_sram_1,
-read_data_sram_2,
-read_data_sram_3,
-read_data_linebuf,
-flush
+   clk_in, 
+   clk_en, 
+   reset, 
+   flush, 
+
+   addr_in,
+   data_in, 
+   data_out, 
+   wen_in, 
+   ren_in, 
+   valid_out, 
+
+   chain_in,
+   chain_out,
+   chain_wen_in,
+   chain_valid_out,
+
+   almost_full, 
+   almost_empty, 
+
+   config_addr, 
+   config_data, 
+   config_read, 
+   config_write, 
+   config_en,
+   config_en_sram, 
+   config_en_linebuf, 
+   config_en_fifo,
+   read_data,
+//; for (my $i = 0; $i < $num_sram_reads; $i++) {
+   `'read_data_sram_' . $i`,
+//; }
+   read_data_linebuf,
+   read_data_fifo
 );
 
+// ========================================================
+// Inputs and Outputs
+// ========================================================
+
+// Clock + Reset
 input clk_in;
 input clk_en;
 input reset;
-input config_en;
-input [3:0] config_en_sram;
-input config_en_linebuf;
+input flush;
+
+// Normal Ports
+input [`$wwidth - 1`:0] addr_in;
+input [`$wwidth - 1`:0] data_in;
 input wen_in;
 input ren_in;
+output reg [`$wwidth - 1`:0] data_out;
+output reg valid_out;
+
+// Chaining
+input  [`$wwidth - 1`:0] chain_in;
+output [`$wwidth - 1`:0] chain_out;
+output chain_valid_out;
 input chain_wen_in;
+
+// Status
+output reg almost_full;
+output reg almost_empty;
+
+// Config
 input [31:0] config_addr;
 input [31:0] config_data;
 input config_read;
 input config_write;
-input [`$dwidth - 1`:0] data_in;
-input [`$dwidth - 1`:0] chain_in;
-input [`$dwidth - 1`:0] addr_in;
-input flush;
+input config_en;
+input [`$num_sram_reads-1`:0] config_en_sram;
+input config_en_linebuf;
+input config_en_fifo;
 output reg [31:0] read_data;
-output reg [31:0] read_data_sram_0;
-output reg [31:0] read_data_sram_1;
-output reg [31:0] read_data_sram_2;
-output reg [31:0] read_data_sram_3;
+//; for (my $i = 0; $i < $num_sram_reads; $i++) {
+output reg [31:0] `'read_data_sram_' . $i`;
+//; }
 output [31:0] read_data_linebuf;
-output chain_valid_out;
-output [`$dwidth - 1`:0] chain_out;
-output reg valid_out;
-output reg almost_full;
-output reg almost_empty;
-output reg [`$dwidth - 1`:0] data_out;
+output [31:0] read_data_fifo;
 
-wire  [1:0] mode;
-wire  tile_en;
-wire [12:0] depth;
-wire  [3:0] almost_count;
-wire        enable_chain;
+// ========================================================
+// Configuration
+// ========================================================
+wire  [3:0]      almost_count;
+wire             enable_chain;
+wire  [1:0]      mode;
+wire             tile_en;
 
-wire gclk, gclk_in, gclk_sram;
-wire wen_in_int;
-wire mem_cen0;
-wire mem_cen1;
-reg mem_cen0_int;
-reg mem_cen1_int;
+wire  [12:0]     depth;
 
-wire lb_valid_out;
-wire fifo_valid_out;
-wire lb_almost_full;
-wire fifo_almost_full;
-wire lb_almost_empty;
-wire fifo_almost_empty;
-wire lb_wen;
-wire lb_ren;
-wire fifo_wen;
-wire fifo_ren;
-
-wire clk;
-wire [`$dwidth - 1`:0] data_in_int;
-wire [`$dwidth - 1`:0] mem_data_out0;
-wire [`$dwidth - 1`:0] mem_data_out1;
-
-wire [`$dwidth - 1`:0] lb_addr;
-wire [`$dwidth - 1`:0] fifo_addr;
-wire [`$dwidth*2 - 1`:0] lb_mem_data_out;
-wire [`$dwidth*2 - 1`:0] fifo_mem_data_out;
-wire [`$dwidth - 1`:0] lb_out;
-wire [`$dwidth - 1`:0] fifo_out;
-
-reg [`$dwidth - 1`:0] mem_data_in0;
-reg [`$dwidth - 1`:0] mem_data_in1;
-reg [31:0] config_mem;
-reg [`$dwidth - 1`:0] mem_addr;
-reg mem_ren0;
-reg mem_wen0;
-reg mem_ren1;
-reg mem_wen1;
-reg sram_sel;
-//reg [15:0] stall_snapshot_0;
-//reg [15:0] stall_snapshot_1;
-reg prev_clk_en;
-//wire [15:0] mem_data_out0_with_snap;
-//wire [15:0] mem_data_out1_with_snap;
+wire             gclk;
+wire             gclk_in;
+reg   [31:0]     config_mem;
 
 assign mode = config_mem[1:0];
 assign tile_en = config_mem[2];
@@ -132,181 +122,281 @@ assign almost_count = config_mem[19:16];
 assign enable_chain = config_mem[19];
 assign gclk_in = (tile_en==1'b1) ? clk_in : 0;
 assign gclk = clk_en ? gclk_in : 0;
-assign gclk_sram = (clk_en || config_en_sram) ? gclk_in : 0;
 
+always @(*) begin
+        case (config_addr[31:24])
+            8'd0 : read_data = config_mem[31:0];  
+            default : read_data = 0;
+        endcase
+end
+
+// ========================================================
+// Chaining - basically changes data in/data out/valid/wen
+// ========================================================
+
+wire wen_in_int;
+wire [`$wwidth - 1`:0] data_in_int;
 
 assign data_in_int = (enable_chain==1'b1)?chain_in:data_in;
 assign wen_in_int = (enable_chain==1'b1)?chain_wen_in:wen_in;
 assign chain_out = data_out;
 assign chain_valid_out = valid_out;
 
-
-//assign mem_data_out0_with_snap = (clk_en > prev_clk_en) ? stall_snapshot_0 : mem_data_out0;
-//assign mem_data_out1_with_snap = (clk_en > prev_clk_en) ? stall_snapshot_1 : mem_data_out1;
-
-/*always @(posedge gclk_in or posedge reset) begin
-   if (reset==1'b1) begin
-      stall_snapshot_0 <= 0;
-      stall_snapshot_1 <= 0;
-      prev_clk_en <= 1;
-   end
-   else begin
-      prev_clk_en <= clk_en;
-      if(prev_clk_en > clk_en) begin
-         stall_snapshot_0 <= mem_data_out0;
-         stall_snapshot_1 <= mem_data_out1;
-      end
-   end
-end*/
-
 always @(posedge clk_in or posedge reset) begin
-  if (reset==1'b1) begin
-    config_mem <= 32'd0;
+  if (reset==1'b1) begin 
+    config_mem <= 32'd0; 
   end else begin
     if (config_en==1'b1) begin
        case (config_addr[31:24])
-//; for (my $j=0; $j<1; $j=$j+1) {
-         8'd`$j`: config_mem[`($j+1)*32-1`:`$j*32`] <= config_data;
-//; }
+       //; for (my $j=0; $j<1; $j=$j+1) {
+         `$j`: config_mem[`($j+1)*32-1`:`$j*32`] <= config_data;
+       //; }
        endcase
     end
   end
 end
 
-
+// ========================================================
+// Do all the functional modes
+// ========================================================
 always @(*) begin
-  read_data_sram_0 = {16'b0, mem_data_out0};
-  read_data_sram_1 = {16'b0, mem_data_out0};
-  read_data_sram_2 = {16'b0, mem_data_out1};
-  read_data_sram_3 = {16'b0, mem_data_out1};
-  if(config_en_sram != 4'b0) begin
-      mem_cen0_int = 1'b1;
-      mem_cen1_int = 1'b1;
-      mem_wen0 = (config_write & (config_en_sram[0] | config_en_sram[1]));
-      mem_ren0 = (config_read & (config_en_sram[0] | config_en_sram[1]));
-      mem_wen1 = (config_write & (config_en_sram[2] | config_en_sram[3]));
-      mem_ren1 = (config_read & (config_en_sram[2] | config_en_sram[3]));
-      mem_addr = {(config_en_sram[3] | config_en_sram[1]), config_addr[31:24]};
-      mem_data_in0 = config_data[15:0];
-      mem_data_in1 = config_data[15:0];
-      data_out = (sram_sel==1'b1)?mem_data_out1:mem_data_out0;
-      valid_out = 1'b0;
-      almost_full = 1'b0;
-      almost_empty = 1'b0;
-  end
-  else begin
-  case (mode)
-    2'd0: begin
-      mem_cen0_int = wen_in_int;
-      mem_cen1_int = wen_in_int;
-      mem_wen0 = lb_wen;
-      mem_ren0 = lb_ren;
-      mem_wen1 = lb_wen;
-      mem_ren1 = lb_ren;
+
+//; my $j = 0;
+//; my $k = 0;
+//; for (my $i = 0; $i < $num_sram_reads; $i++) {
+   `'read_data_sram_' . $i` = { 16'b0, //'
+		mem_data_out[`$k`]}; 
+   //; $j = ($j + 1) % $width_sram_reads;
+   //; if($j == 0) {
+      //; $k++;  
+   //; }  
+//; }
+
+  if(config_en_sram != 0) begin
+
+   //; for (my $i = 0; $i < $bbanks; $i++) { 
+      mem_cen_int[`$i`] = 1'b1; //' 
+   //; }
+   //; for (my $i = 0; $i < $bbanks; $i++) { 
+      mem_wen[`$i`] =  (config_write & (
+      //; for (my $j = $sets_per_sram-1; $j > 0; $j--) {	
+                      config_en_sram[`$j + $i*$sets_per_sram`] |
+      //; }
+                      config_en_sram[`$i*$sets_per_sram`]));
+   //; }
+
+   //; for (my $i = 0; $i < $bbanks; $i++) { 
+      mem_ren[`$i`] =  (config_read & (
+      //; for (my $j = $sets_per_sram-1; $j > 0; $j--) {	
+                      config_en_sram[`$j + $i*$sets_per_sram`] |
+      //; }
+                      config_en_sram[`$i*$sets_per_sram`]));
+   //; }
+
+      // TODO     
+   //; for (my $i = 0; $i < $bbanks; $i++) {
+      mem_addr[`$i`] = {(config_en_sram[3] | config_en_sram[1]), config_addr[31:24]};
+   //; }
+   //; for (my $i = 0; $i < $bbanks; $i++) {
+      mem_data_in[`$i`] = config_data[15:0];
+   //; }
+
+      data_out = mem_data_out[sram_sel];
+      valid_out = 1'b0; 
+      almost_full = 1'b0; 
+      almost_empty = 1'b0; 
+
+   end
+
+   else begin
+   case (mode)
+
+   // ========================================================
+   // LINE BUFFER MODE
+   // ========================================================
+   2'd0: begin 
+      mem_cen_int = lb_cen;
+      mem_wen = lb_wen;
+//      mem_ren = lb_ren; TODO
+      mem_ren = {`$bbanks`{1'b1}};
       mem_addr = lb_addr;
-      {mem_data_in1,mem_data_in0} = lb_mem_data_out;
+      mem_data_in = lb_mem_data_out;
       data_out = lb_out; 
       valid_out = lb_valid_out & wen_in_int;
       almost_full = lb_almost_full;
       almost_empty = lb_almost_empty;
-    end
-    2'd1: begin
-      mem_cen0_int = 1'b1;
-      mem_cen1_int = 1'b1;
-      mem_wen0 = fifo_wen;
-      mem_ren0 = fifo_ren;
-      mem_wen1 = fifo_wen;
-      mem_ren1 = fifo_ren;
+   end
+
+   // ========================================================
+   // FIFO MODE
+   // ========================================================
+   2'd1: begin 
+      mem_cen_int = fifo_cen;
+      mem_wen = fifo_wen;
+      //mem_ren = fifo_ren;
+      mem_ren = {`$bbanks`{1'b1}};
       mem_addr = fifo_addr;
-      {mem_data_in1,mem_data_in0} = fifo_mem_data_out;
+      mem_data_in = fifo_mem_data_out;
       data_out = fifo_out;
-      valid_out = fifo_valid_out;
+      valid_out = ~(fifo_valid_out);
       almost_full = fifo_almost_full;
       almost_empty = fifo_almost_empty;
-    end
-    2'd2: begin
-      mem_cen0_int = 1'b1;
-      mem_cen1_int = 1'b1;
-      mem_wen0 = (~addr_in[`$awidth - 1`] & wen_in_int);
-      mem_ren0 = ren_in;
-      mem_wen1 = (addr_in[`$awidth - 1`] & wen_in_int);
-      mem_ren1 = ren_in;
-      mem_addr = addr_in;      
-      mem_data_in0 = data_in;
-      mem_data_in1 = data_in;
-      data_out = (sram_sel==1'b1)?mem_data_out1:mem_data_out0;
-      valid_out = 1'b1;  
-      almost_full = 1'b0; 
-      almost_empty = 1'b0; 
-    end
-    default: begin
-      mem_cen0_int = 1'b1;
-      mem_cen1_int = 1'b1;
-      mem_wen0 = 1'b0; 
-      mem_ren0 = 1'b0;
-      mem_wen1 = 1'b0; 
-      mem_ren1 = 1'b1;
-      mem_addr = `$dwidth`'d0;      
-      mem_data_in0 = `$dwidth`'d0;
-      mem_data_in1 = `$dwidth`'d0;
-      data_out = `$dwidth`'d0;
-      valid_out = 1'b0;
+   end
+
+   // ========================================================
+   // SRAM/LUT MODE
+   // ========================================================
+   2'd2: begin 
+      mem_cen_int = sram_cen;
+      mem_wen = sram_wen;
+      //mem_ren = sram_ren;
+      mem_ren = {`$bbanks`{1'b1}};
+      mem_addr = sram_addr;
+      mem_data_in = sram_mem_data_out;
+      data_out = sram_out;
+      valid_out = 1'b1;
       almost_full = 1'b0;
       almost_empty = 1'b0;
-    end
-  endcase
-  end //else
-end
+   end
 
+   // ========================================================
+   // DEFAULT MODE
+   // ========================================================
+   default: begin
+   //; for (my $i = 0; $i < $bbanks; $i++) {
+      mem_data_in[`$i`] = 0; 
+   //; }      
+      mem_cen_int = ~0;
+      mem_wen = 0;
+      mem_ren = 0;
+   //; for (my $i = 0; $i < $bbanks; $i++) {
+      mem_addr[`$i`] = 0; 
+   //; }
+      data_out = 0; 
+      valid_out = 1'b0; 
+      almost_full = 1'b0; 
+      almost_empty = 1'b0; 
+   end
+
+   endcase
+   end //else
+end // END ALWAYS
+
+// ========================================================
+// Select a specific SRAM (from previous cycle)
+// ========================================================
+reg [`$bank_addr_width-1`:0] sram_sel;
 always @(posedge gclk) begin
-  sram_sel <= addr_in[`$awidth - 1`];
+  sram_sel <= addr_in[`$awidth + $bank_addr_width-1`:`$awidth`];
 end
 
-assign mem_cen0 = mem_cen0_int & (mem_wen0 | mem_ren0);
-assign mem_cen1 = mem_cen1_int & (mem_wen1 | mem_ren1);
+// ========================================================
+// Basically gate the memory CEN
+// ========================================================
+wire [`$bbanks-1`:0] mem_cen;
+reg  [`$bbanks-1`:0] mem_cen_int;
 
+//; for (my $i = 0; $i < $bbanks; $i++) {
+assign mem_cen[`$i`] = mem_cen_int[`$i`] & ( mem_wen[`$i`] | mem_ren[`$i`]);
+//; }
 
-always @(*) begin
-        case (config_addr[31:24])
-            8'd0 : read_data = config_mem[31:0];
-            default : read_data = 'h0;
-        endcase
-    end
+// ========================================================
+// Instantiate (Row) LineBuffer
+// ========================================================
+wire [`$awidth-1`:0] lb_addr [`$bbanks-1`:0];
+wire [`$wwidth-1`:0] lb_mem_data_out [`$bbanks-1`:0];
+wire [`$wwidth-1`:0] lb_out;
+wire [`$bbanks-1`:0] lb_wen;
+wire [`$bbanks-1`:0] lb_cen;
+//wire [`$bbanks-1`:0] lb_ren;
+wire lb_valid_out;
+wire lb_almost_full;
+wire lb_almost_empty;
 
-//; my $lb = generate('linebuffer_control', 'linebuffer_control', dwidth => $dwidth, ddepth => $ddepth );
+//; my $lb = generate('linebuffer_control', 'linebuffer_control', dwidth => $dwidth, ddepth => $ddepth, bbanks => $bbanks, wwidth => $wwidth );
 `$lb->instantiate()`
 (
 .clk(gclk),
+.clk_en(1), 
 .reset(reset),
 .flush(flush),
-.fsm_en(wen_in_int),
-.config_en(config_en_linebuf),
-.config_addr(config_addr),
-.config_data(config_data),
-.data_in(data_in_int),
 .wen(wen_in_int),
+.data_in(data_in_int),
 .data_out(lb_out),
-.stall_read(0),
-.valid(lb_valid_out),
-.almost_full(lb_almost_full),
 .almost_empty(lb_almost_empty),
-.almost_count(almost_count),
+.almost_full(lb_almost_full),
+
+/* verilator lint_off PINCONNECTEMPTY */
+.empty(),
+.full(),
+/* verilator lint_on PINCONNECTEMPTY */
+
+.linebuffer_data_in(lb_mem_data_out), // TO MEM
+.linebuffer_cen_mem(lb_cen),
+.linebuffer_wen_mem(lb_wen),
+.linebuffer_addr_mem(lb_addr),
+.linebuffer_data_out(mem_data_out), // FROM MEM
+
 .depth(depth),
-.addr_to_mem(lb_addr),
-.data_to_mem(lb_mem_data_out),
-.data_from_mem({mem_data_out1,mem_data_out0}),
-.wen_to_mem(lb_wen),
-.ren_to_mem(lb_ren),
-.read_data(read_data_linebuf)
+.valid(lb_valid_out),
+
+.config_en(config_en_linebuf),
+.config_wr(config_write),
+.config_addr(config_addr),
+.config_wr_data(config_data),
+.config_rd_data(read_data_linebuf)
 );
 
 
+// ========================================================
+// Instantiate SRAM Controller
+// ========================================================
+wire [`$awidth-1`:0] sram_addr [`$bbanks-1`:0];
+wire [`$wwidth-1`:0] sram_mem_data_out [`$bbanks-1`:0];
+wire [`$wwidth-1`:0] sram_out;
+wire [`$bbanks-1`:0] sram_wen;
+//wire [`$bbanks-1`:0] sram_ren;
+wire [`$bbanks-1`:0] sram_cen;
 
-//; my $fifo = generate('fifo_control', 'fifo_control', dwidth => $dwidth, ddepth => $ddepth );
-` $fifo->instantiate()`
+//; my $sram_cont = generate('sram_control', 'sram_control', dwidth => $dwidth, ddepth => $ddepth, wwidth => $wwidth, bbanks => $bbanks );
+`$sram_cont->instantiate()`
 (
 .clk(gclk),
 .clk_en(1),
+.reset(reset),
+.flush(flush),
+
+.data_in(data_in_int),
+.wen(wen_in_int),
+.data_out(sram_out),
+.ren(ren_in),
+.addr(addr_in[`$awidth + $bank_addr_width- 1`:0]),
+
+.sram_to_mem_data(sram_mem_data_out),
+.sram_to_mem_cen(sram_cen),
+.sram_to_mem_wen(sram_wen),
+.sram_to_mem_addr(sram_addr),
+.mem_to_sram_data(mem_data_out)
+);
+
+// ========================================================
+// Instantiate FIFO 
+// ========================================================
+wire [`$awidth-1`:0] fifo_addr [`$bbanks-1`:0];
+wire [`$wwidth-1`:0] fifo_mem_data_out [`$bbanks-1`:0];
+wire [`$wwidth-1`:0] fifo_out;
+wire [`$bbanks-1`:0] fifo_wen;
+//wire [`$bbanks-1`:0] fifo_ren;
+wire [`$bbanks-1`:0] fifo_cen;
+wire fifo_almost_full;
+wire fifo_almost_empty;
+wire fifo_valid_out;
+
+//; my $fifo = generate('fifo_control', 'fifo_control', dwidth => $dwidth, ddepth => $ddepth, wwidth => $wwidth, bbanks => $bbanks ); 
+`$fifo->instantiate()`
+(
+.clk(gclk),
+.clk_en(1), 
 .reset(reset),
 .flush(flush),
 .ren(ren_in),
@@ -315,36 +405,50 @@ always @(*) begin
 .data_out(fifo_out),
 .almost_empty(fifo_almost_empty),
 .almost_full(fifo_almost_full),
-.empty(),
-.full(),
+
 .fifo_to_mem_data(fifo_mem_data_out),
-.fifo_to_mem_cen(),
-.fifo_to_mem_wen(),
-.fifo_to_mem_addr(),
-.mem_to_fifo_data(0)
+.fifo_to_mem_cen(fifo_cen),
+.fifo_to_mem_wen(fifo_wen),
+.fifo_to_mem_addr(fifo_addr),
+.mem_to_fifo_data(mem_data_out),
+/* verilator lint_off PINCONNECTEMPTY */
+.num_words_mem(),
+.full(),
+.empty(fifo_valid_out),
+/* verilator lint_on PINCONNECTEMPTY */
+
+.config_en(config_en_fifo),
+.config_wr(config_write),
+.config_addr(config_addr),
+.config_wr_data(config_data),
+.config_rd_data(read_data_fifo)
 );
 
+// ========================================================
+// Instantiate memory banks
+// ========================================================
+wire [`$wwidth-1`:0] mem_data_out [`$bbanks-1`:0];
+reg  [`$wwidth-1`:0]  mem_data_in [`$bbanks-1`:0];
+reg  [`$awidth-1`:0] mem_addr [`$bbanks-1`:0];
+reg  [`$bbanks-1`:0] mem_ren;
+reg  [`$bbanks-1`:0] mem_wen;
 
+wire gclk_sram;
+assign gclk_sram = (clk_en | (|config_en_sram)) ? gclk_in : 0;
 
 //; my $mem = generate('mem', 'mem', dwidth => $dwidth, ddepth => $ddepth, wwidth=> $wwidth);
-
-//; for (my $i = 0; $i < $bbanks; $i++){
-
-//; my $mem_obj = clone($mem, 'mem_inst' . $i);
-`$mem_obj->instantiate()`
-(
-.data_out(`'mem_data_out' . $i`),
-.data_in(`'mem_data_in' . $i`),
-.clk(gclk_sram),
-.cen(`'mem_cen' . $i`),
-.wen(`'mem_wen' . $i`),
-.addr(mem_addr[`$awidth - 2`:0]),
-.pw_sel(0)
-);
-
-
+//; for (my $i = 0; $i < $bbanks; $i++) {
+   //; my $mem_obj = clone($mem, 'mem_inst' . $i);
+   `$mem_obj->instantiate()`
+   (
+   .data_out(mem_data_out[`$i`]),
+   .data_in(mem_data_in[`$i`]),
+   .clk(gclk_sram),
+   .cen(mem_cen[`$i`]),
+   .wen(mem_wen[`$i`]),
+   .addr(mem_addr[`$i`]),
+   .pw_sel(0)
+   );
 //; }
 
-
 endmodule
-

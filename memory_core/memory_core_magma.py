@@ -9,14 +9,16 @@ from gemstone.generator.from_verilog import FromVerilog
 from memory_core import memory_core_genesis2
 from typing import List
 
-
 class MemCore(ConfigurableCore):
-    def __init__(self, data_width, data_depth):
+    def __init__(self, data_width, word_width, data_depth, num_banks):
         super().__init__(8, 32)
 
         self.data_width = data_width
         self.data_depth = data_depth
-        TData = magma.Bits[self.data_width]
+        self.num_banks = num_banks
+        self.word_width = word_width
+
+        TData = magma.Bits[self.word_width]
         TBit = magma.Bits[1]
 
         self.add_ports(
@@ -36,7 +38,9 @@ class MemCore(ConfigurableCore):
         param_mapping = memory_core_genesis2.param_mapping
         generator = wrapper.generator(param_mapping, mode="declare")
         circ = generator(data_width=self.data_width,
-                         data_depth=self.data_depth)
+                         data_depth=self.data_depth,
+                         word_width=self.word_width,
+                         num_banks=self.num_banks)
         self.underlying = FromMagma(circ)
 
         self.wire(self.ports.data_in, self.underlying.ports.data_in)
@@ -54,9 +58,10 @@ class MemCore(ConfigurableCore):
 
         # TODO(rsetaluri): Actually wire these inputs.
         zero_signals = (
+            ("config_en_fifo", 1),
             ("config_en_linebuf", 1),
             ("chain_wen_in", 1),
-            ("chain_in", self.data_width),
+            ("chain_in", self.word_width),
         )
         one_signals = (
             ("config_read", 1),
@@ -71,8 +76,12 @@ class MemCore(ConfigurableCore):
             self.wire(Const(val), self.underlying.ports[name])
         self.wire(Const(magma.bits(0, 24)),
                   self.underlying.ports.config_addr[0:24])
-        # we have five features in total
+
+
+        # TODO ADD FEATURES (mstrange)
+        # we have six features in total
         # 0:   LINEBUF
+	
         # 1-4: SMEM
         # current setup is already in line buffer mode, so we pass self in
         # notice that config_en_linebuf is to change the address in the
