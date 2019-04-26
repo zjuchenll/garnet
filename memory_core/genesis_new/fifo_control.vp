@@ -134,11 +134,14 @@ assign cen_mem[`$i`] = ren_mem[`$i`] | wen_mem_en[`$i`];
 // Status signals
 // ================
 //; for(my $i = $bbanks-1; $i > 0; $i--) {
-	assign ren_mem[`$i`] = ren & ((read_addr[`$bank_addr_width-1`:0]==`$i`));
-	assign wen_mem[`$i`] = wen & ((read_addr[`$bank_addr_width-1`:0]==`$i`));
+	assign ren_mem[`$i`] = ren & ((read_addr[`$bank_addr_width-1`]));
+//; }   
+	assign ren_mem[0] = ren & ((~read_addr[`$bank_addr_width-1`]) | init_stage);
+
+//; for(my $i = $bbanks-1; $i > 0; $i--) {
+	assign wen_mem[`$i`] = wen & ((write_addr[`$bank_addr_width-1`]));
 //; }
-	assign wen_mem[0] = wen & ((read_addr[`$bank_addr_width-1`:0]==0) | init_stage);
-	assign ren_mem[0] = ren & ((read_addr[`$bank_addr_width-1`:0]==0) | init_stage);
+	assign wen_mem[0] = wen & ((~write_addr[`$bank_addr_width-1`]) | init_stage);
 
 //; for(my $i = 0; $i < $bbanks; $i++) {
 	assign wen_mem_en[`$i`] = (wen_mem[`$i`] & ~(same_bank[`$i`])) | write_buffed[`$i`];

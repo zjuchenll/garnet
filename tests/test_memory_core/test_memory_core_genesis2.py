@@ -61,10 +61,19 @@ class MemoryCoreTester(ResetTester, ConfigurationTester):
         self.poke(self._circuit.addr_in, addr)
         self.poke(self._circuit.ren_in, 1)
         self.eval()
+
         # _/
         self.poke(self._circuit.clk_in, 1)
         self.eval()
+        self.poke(self._circuit.ren_in, 0)
+
+     #   self.poke(self._circuit.clk_in,0)
+        self.eval()
+
+
         self.functional_model.read(addr)
+    #    self.poke(self._circuit.clk_in, 1)
+    #    self.eval()
         # Don't expect anything after for now
         self.functional_model.data_out = fault.AnyValue
 
@@ -76,7 +85,7 @@ class MemoryCoreTester(ResetTester, ConfigurationTester):
         self.poke(self._circuit.addr_in, addr)
         self.poke(self._circuit.data_in, data)
         self.eval()
- 
+
         # _/
         self.poke(self._circuit.clk_in, 1)
         self.eval()
@@ -162,7 +171,7 @@ def test_sram_basic():
 #        tester.read_and_write(addr, i)
         tester.read_and_write(addr, random.randint(0, (1 << 10)))
         tester.read(addr)
-    
+
     print('Made it to here mek end?')
     tester.compile_and_run(directory="tests/test_memory_core/build",
                            magma_output="verilog",

@@ -67,7 +67,7 @@ assign clk_gated = clk & clk_en;
 // Pass signals to actual memory module
 // ===========================
 //; for(my $i = 0; $i < $bbanks; $i++) {
-	assign bank_seld[`$i`] = (addr[`$awidth-1`:`$awidth-$bank_addr_width-1`] == `$i`);
+	assign bank_seld[`$i`] = (addr[`$awidth-1`:`$awidth-$bank_addr_width`] == `$i`);
 //; }
 //; for(my $i = 0; $i < $bbanks; $i++) {
 	assign sram_to_mem_data[`$i`] = data_in; 
