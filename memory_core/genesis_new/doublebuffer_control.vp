@@ -1,0 +1,176 @@
+//;use POSIX;
+//;my $backtick = "`";
+///////////////////////////////////////////////////////////////////
+// CGRA memory generator
+//////////////////////////////////////////////////////////////////
+`$backtick`define xassert(condition, message) if(condition) begin $display(message); $finish(1); end
+
+//; my $dwidth 	 = parameter(Name=>'dwidth', val=> 64, doc=>'bank interface width');
+//; my $wwidth   = parameter(Name=>'wwidth', val=> 16, doc=>'word width');
+//; my $ddepth   = parameter(Name=>'ddepth', val=> 128, doc=>'number of words in the memory');
+//; my $bbanks   = parameter(Name=>'bbanks', val=> 2, doc=>'number of banks in memory');
+//; 
+//; my $iterator_support = parameter(Name=>'iterator_support', val=> 8, doc=>'number of supported nested iterations');
+//; my $dim_width = int(ceil(log($iterator_support)/log(2)));
+//; my $numwords = int($dwidth/$wwidth);
+//; my $bank_addr_width = int(ceil(log($bbanks)/log(2)));
+//; my $awidth = int(ceil(log($ddepth)/log(2))) + int(ceil(log($numwords)/log(2)));
+//; my $full_addr = $awidth + $bank_addr_width;
+
+module `mname()`(
+
+   clk,
+   clk_en,
+   reset,
+   flush,
+   wen,
+   data_in,
+   data_out,
+   addr_in,
+
+   doublebuffer_data_in,
+   doublebuffer_cen_mem,
+   doublebuffer_wen_mem,
+   doublebuffer_addr_mem,
+   doublebuffer_data_out,
+
+   // configuration to control the internal state
+   config_en,
+   config_wr,
+   config_addr,
+   config_wr_data,
+   config_rd_data,
+
+   depth,
+   valid,
+   switch
+
+);
+
+
+// =============================================
+// Depth or Ping Pong In Configuration
+// =============================================
+
+
+// ==============================================
+// I/O
+// ==============================================
+input wire                   clk;
+input wire                   clk_en;
+input wire                   reset;
+
+input wire                   switch;
+
+input wire                   flush;
+input wire                   wen;
+input wire  [`$wwidth-1`:0]  data_in;
+output wire [`$wwidth-1`:0]  data_out;
+
+input wire  [`$awidth-1`:0]  addr_in; 
+
+output wire [`$wwidth-1`:0]  doublebuffer_data_in  [`$bbanks-1`:0];
+output wire [`$bbanks-1`:0]  doublebuffer_cen_mem;
+output wire [`$bbanks-1`:0]  doublebuffer_wen_mem;
+output wire [`$awidth-1`:0]  doublebuffer_addr_mem [`$bbanks-1`:0];
+input wire  [`$wwidth-1`:0]  doublebuffer_data_out [`$bbanks-1`:0];
+
+// Configuration
+input wire                   config_en;
+input wire                   config_wr;
+input wire [31:0]            config_addr;
+input wire [31:0]            config_wr_data;
+output reg [31:0]            config_rd_data;
+
+input wire [12:0]            depth;
+output reg                   valid;
+
+// ==============================================
+// Internal
+// ==============================================
+wire [12:0]                  num_words_mem;
+reg  [12:0]                  depth_int;
+
+wire                    ren;
+assign ren = (depth_int > 0) ? (num_words_mem >= depth_int) : 0;
+
+reg ping_npong;
+
+// ==============================================
+// Configuration
+// ==============================================
+reg [`$dim_width`:0] dimensionality;
+reg [31:0] stride []
+reg [] order
+reg 
+//; for (my $idx = 0; $idx < $iterator_support; $idx++) {
+reg [31:0] `'stride_' . $idx`;
+//; }
+//; for (my $idx = 0; $idx < $iterator_support; $idx++) {
+reg [31:0] `'order_' . $idx`;
+//; }
+//; for (my $idx = 0; $idx < $iterator_support; $idx++) {
+reg [31:0] `'size_' . $idx`;
+//; }
+
+reg [31:0] offset;
+always @ (posedge clk) begin
+  offset <= 32'd25
+end
+
+
+always @(*) begin
+    if (config_en) begin
+        if (config_wr) begin
+          case (config_addr)
+            offset: begin
+              
+            end
+          //; for (my $idx = 0; $idx < $iterator_support; $idx++) {
+            `3*$idx + 1`: begin
+              stride
+            end
+          //; }
+                fifo_config_en = config_en;
+                fifo_config_wr = config_wr;
+                fifo_config_addr = {29'b0,config_addr[2:0]};
+                fifo_config_wr_data = config_wr_data;
+          endcase
+        end
+        else begin
+          // line buffer only has one state register
+          config_rd_data = {19'b0 ,depth};
+        end
+    end
+end
+
+always @(posedge clk, posedge reset) begin
+  if (reset) begin  
+    depth_int <= 0;
+    valid <= 0;
+  end
+  else begin
+    depth_int <= depth;
+    // write the configuration
+    if (config_en) begin
+      // =================================
+      // Config WRITE
+      // =================================
+      if (config_wr) begin
+      //; for (my $idx = 0; $idx < $iterator_support; $idx++) {
+        `3*$idx + 1`: begin
+          stride
+        end
+      //; }
+      end
+      // =================================
+      // Config READ
+      // =================================
+      else begin
+
+      end
+    end
+  end
+end
+
+endmodule

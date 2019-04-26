@@ -171,14 +171,14 @@ def test_interconnect_line_buffer():
         tester.poke(circuit.interface[src], i)
         tester.eval()
 
-        tester.step(1)
+#        tester.step(1)
 
         if i > (depth + 10):
             tester.expect(circuit.interface[dst], i * 2 - depth)
 
         # toggle the clock
-        tester.step(1)
-#        tester.step(2)
+#        tester.step(1)
+        tester.step(2)
 
     #with tempfile.TemporaryDirectory() as tempdir:
     tempdir = "tests/test_interconnect/build"

@@ -57,7 +57,7 @@ wire [`$bbanks-1`:0] bank_seld;
 wire clk_gated;
 
 reg [`$bbanks-1`:0] sram_to_mem_ren_reg;
-
+reg [`$wwidth-1`:0] data_out_reg;
 // =============
 // Clock gate
 // =============
@@ -89,7 +89,7 @@ assign data_out =
 //; for(my $j = $bbanks-1; $j > 0; $j--) {
 	sram_to_mem_ren_reg[`$j`] ? mem_to_sram_data[`$j`] :
 //; }
-	mem_to_sram_data[0];
+	sram_to_mem_ren_reg[0] ? mem_to_sram_data[0] : data_out_reg;
 
 // ===================
 // Flop the ren for proper output
@@ -98,18 +98,21 @@ always @ (posedge clk_gated, posedge reset) begin
 	if(reset) begin
 //; for(my $i = 0; $i < $bbanks; $i++) {
 		sram_to_mem_ren_reg[`$i`] <= 0;
-//; }	
+//; }
+    data_out_reg <= 0;
 	end
 	else begin
 		if(flush) begin
 //; for(my $i = 0; $i < $bbanks; $i++) {
 			sram_to_mem_ren_reg[`$i`] <= 0;
 //; }				
+      data_out_reg <= 0;
 		end
 		else begin
 //; for(my $i = 0; $i < $bbanks; $i++) {
 			sram_to_mem_ren_reg[`$i`] <=  bank_seld[`$i`] & ren;
 //; }
+      data_out_reg <= data_out;
 		end
 	end
 end
