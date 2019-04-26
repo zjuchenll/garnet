@@ -67,13 +67,13 @@ class MemoryCoreTester(ResetTester, ConfigurationTester):
         self.eval()
         self.poke(self._circuit.ren_in, 0)
 
-     #   self.poke(self._circuit.clk_in,0)
+        #self.poke(self._circuit.clk_in,0)
         self.eval()
 
 
         self.functional_model.read(addr)
-    #    self.poke(self._circuit.clk_in, 1)
-    #    self.eval()
+        #self.poke(self._circuit.clk_in, 1)
+        #self.eval()
         # Don't expect anything after for now
         self.functional_model.data_out = fault.AnyValue
 
