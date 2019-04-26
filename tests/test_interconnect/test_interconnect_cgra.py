@@ -88,16 +88,18 @@ def test_interconnect_point_wise(batch_size: int):
         tester.eval()
         tester.expect(circuit.interface[dst_name], num_1 * num_2)
 
-    with tempfile.TemporaryDirectory() as tempdir:
-        for genesis_verilog in glob.glob("genesis_verif/*.*"):
-            shutil.copy(genesis_verilog, tempdir)
-        shutil.copy(os.path.join("tests", "test_memory_core",
-                                 "sram_stub.v"),
-                    os.path.join(tempdir, "sram_512w_16b.v"))
-        tester.compile_and_run(target="verilator",
-                               magma_output="coreir-verilog",
-                               directory=tempdir,
-                               flags=["-Wno-fatal"])
+    #with tempfile.TemporaryDirectory() as tempdir:
+    tempdir = "tests/test_interconnect/build"
+    for genesis_verilog in glob.glob("genesis_verif/*.*"):
+        shutil.copy(genesis_verilog, tempdir)
+ #       shutil.copy(os.path.join("tests", "test_memory_core",
+ #                                "sram_stub.v"),
+ #                   os.path.join(tempdir, "sram_512w_16b.v"))
+    tester.compile_and_run(target="verilator",
+                           magma_output="coreir-verilog",
+                           directory=tempdir,
+                           #directory="tests/test_interconnect/build",
+                           flags=["-Wno-fatal --trace"])
 
 
 def test_interconnect_line_buffer():
@@ -169,22 +171,27 @@ def test_interconnect_line_buffer():
         tester.poke(circuit.interface[src], i)
         tester.eval()
 
-        if i > depth + 10:
+        tester.step(1)
+
+        if i > (depth + 10):
             tester.expect(circuit.interface[dst], i * 2 - depth)
 
         # toggle the clock
-        tester.step(2)
+        tester.step(1)
+#        tester.step(2)
 
-    with tempfile.TemporaryDirectory() as tempdir:
-        for genesis_verilog in glob.glob("genesis_verif/*.*"):
-            shutil.copy(genesis_verilog, tempdir)
-        shutil.copy(os.path.join("tests", "test_memory_core",
-                                 "sram_stub.v"),
-                    os.path.join(tempdir, "sram_512w_16b.v"))
-        tester.compile_and_run(target="verilator",
-                               magma_output="coreir-verilog",
-                               directory=tempdir,
-                               flags=["-Wno-fatal"])
+    #with tempfile.TemporaryDirectory() as tempdir:
+    tempdir = "tests/test_interconnect/build"
+    print(str(tempdir))
+    for genesis_verilog in glob.glob("genesis_verif/*.*"):
+        shutil.copy(genesis_verilog, tempdir)
+#    shutil.copy(os.path.join("tests", "test_memory_core",
+#                             "sram_stub.v"),
+#                os.path.join(tempdir, "sram_512w_16b.v"))
+    tester.compile_and_run(target="verilator",
+                           magma_output="coreir-verilog",
+                           directory=tempdir,
+                           flags=["-Wno-fatal --trace"])
 
 
 def test_interconnect_sram():
@@ -258,16 +265,17 @@ def test_interconnect_sram():
         tester.eval()
         tester.expect(circuit.interface[dst], i + 10)
 
-    with tempfile.TemporaryDirectory() as tempdir:
-        for genesis_verilog in glob.glob("genesis_verif/*.*"):
-            shutil.copy(genesis_verilog, tempdir)
-        shutil.copy(os.path.join("tests", "test_memory_core",
-                                 "sram_stub.v"),
-                    os.path.join(tempdir, "sram_512w_16b.v"))
-        tester.compile_and_run(target="verilator",
-                               magma_output="coreir-verilog",
-                               directory=tempdir,
-                               flags=["-Wno-fatal"])
+    #with tempfile.TemporaryDirectory() as tempdir:
+    tempdir = "tests/test_interconnect/build"
+    for genesis_verilog in glob.glob("genesis_verif/*.*"):
+        shutil.copy(genesis_verilog, tempdir)
+#        shutil.copy(os.path.join("tests", "test_memory_core",
+#                                 "sram_stub.v"),
+#                    os.path.join(tempdir, "sram_512w_16b.v"))
+    tester.compile_and_run(target="verilator",
+                           magma_output="coreir-verilog",
+                           directory=tempdir,
+                           flags=["-Wno-fatal --trace"])
 
 
 def create_cgra(chip_size: int, add_io: bool = False):
@@ -310,7 +318,8 @@ def create_cgra(chip_size: int, add_io: bool = False):
                 else:
                     core = IO1bit()
             else:
-                core = MemCore(16, 1024) if ((x - margin) % 2 == 1) else \
+      #          core = MemCore(16, 1024) if ((x - margin) % 2 == 1) else \
+                core = MemCore(64, 16, 512, 2) if ((x - margin) % 2 == 1) else \
                     PECore()
             cores[(x, y)] = core
 
