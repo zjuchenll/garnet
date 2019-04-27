@@ -326,10 +326,8 @@ wire lb_almost_empty;
 .almost_empty(lb_almost_empty),
 .almost_full(lb_almost_full),
 
-/* verilator lint_off PINCONNECTEMPTY */
 .empty(),
 .full(),
-/* verilator lint_on PINCONNECTEMPTY */
 
 .linebuffer_data_in(lb_mem_data_out), // TO MEM
 .linebuffer_cen_mem(lb_cen),
@@ -411,11 +409,9 @@ wire fifo_valid_out;
 .fifo_to_mem_wen(fifo_wen),
 .fifo_to_mem_addr(fifo_addr),
 .mem_to_fifo_data(mem_data_out),
-/* verilator lint_off PINCONNECTEMPTY */
 .num_words_mem(),
 .full(),
 .empty(fifo_valid_out),
-/* verilator lint_on PINCONNECTEMPTY */
 
 .config_en(config_en_fifo),
 .config_wr(config_write),
