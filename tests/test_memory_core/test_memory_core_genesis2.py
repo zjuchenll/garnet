@@ -10,10 +10,6 @@ from gemstone.common.testers import ResetTester, ConfigurationTester
 
 
 def teardown_function():
-    #for item in glob.glob('genesis_*'):
-     #   print("a")
-        #os.system(f"rm -r {item}")
-    #os.system(f"rm MEMmemory_core")
     return
 
 
@@ -33,10 +29,6 @@ def test_main(capsys):
     memory_core_genesis2.memory_core_wrapper.main(
         argv=argv, param_mapping=memory_core_genesis2.param_mapping)
     out, _ = capsys.readouterr()
-#    assert out == f"""\
-#Running genesis cmd 'Genesis2.pl -parse -generate -top memory_core -input memory_core/genesis/input_sr.vp memory_core/genesis/output_sr.vp memory_core/genesis/linebuffer_control.vp memory_core/genesis/fifo_control.vp memory_core/genesis/mem.vp memory_core/genesis/memory_core.vp -parameter memory_core.dwidth='16' -parameter memory_core.ddepth='1024''
-#memory_core(clk_in: In(Clock), clk_en: In(Bit), reset: In(AsyncReset), config_addr: In(Bits[32]), config_data: In(Bits[32]), config_read: In(Bit), config_write: In(Bit), config_en: In(Enable), config_en_sram: In(Bits[4]), config_en_linebuf: In(Bit), data_in: In(Bits[16]), data_out: Out(Bits[16]), wen_in: In(Bit), ren_in: In(Bit), valid_out: Out(Bit), chain_in: In(Bits[16]), chain_out: Out(Bits[16]), chain_wen_in: In(Bit), chain_valid_out: Out(Bit), almost_full: Out(Bit), almost_empty: Out(Bit), addr_in: In(Bits[16]), read_data: Out(Bits[32]), read_data_sram_0: Out(Bits[32]), read_data_sram_1: Out(Bits[32]), read_data_sram_2: Out(Bits[32]), read_data_sram_3: Out(Bits[32]), read_data_linebuf: Out(Bits[32]), flush: In(Bit))
-#"""  # nopep8
 
 
 class MemoryCoreTester(ResetTester, ConfigurationTester):
@@ -67,9 +59,8 @@ class MemoryCoreTester(ResetTester, ConfigurationTester):
         self.eval()
         self.poke(self._circuit.ren_in, 0)
 
-        self.poke(self._circuit.clk_in,0)
+        self.poke(self._circuit.clk_in, 0)
         self.eval()
-
 
         self.functional_model.read(addr)
         self.poke(self._circuit.clk_in, 1)
@@ -150,9 +141,7 @@ def test_sram_basic():
     # Perform a sequence of random writes
     for i in range(num_writes):
         addr = get_fresh_addr(addrs)
-        #addr = i
         # TODO: Should be parameterized by data_width
-        #data = i
         data = random.randint(0, (1 << 10))
         tester.write(addr, data)
         addrs.add(addr)
@@ -165,10 +154,7 @@ def test_sram_basic():
 
     print('Made it to here mek2')
     for i in range(num_writes):
-        #addr = i
         addr = get_fresh_addr(addrs)
-        print(str(addr))
-#        tester.read_and_write(addr, i)
         tester.read_and_write(addr, random.randint(0, (1 << 10)))
         tester.read(addr)
 
