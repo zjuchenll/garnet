@@ -5,63 +5,59 @@ import os
 from gemstone.common.testers import BasicTester
 from canal.global_signal import apply_global_meso_wiring
 from canal.interconnect import Interconnect
-from canal.util import create_uniform_interconnect, SwitchBoxType
+from canal.util import create_uniform_interconnect, SwitchBoxType, IOSide
 from memory_core.memory_core_magma import MemCore
-from pe_core.pe_core_magma import PECore
+from peak_core.peak_core import PeakCore
+from lassen.sim import gen_pe
+import lassen.asm as asm
 from canal.cyclone import SwitchBoxSide, SwitchBoxIO
 from io_core.io16bit_magma import IO16bit
 from io_core.io1bit_magma import IO1bit
+from archipelago import pnr
 import pytest
 import random
+from power_domain.pd_pass import add_power_domain
+import magma
+
+
+@pytest.fixture(scope="module")
+def cw_files():
+    filenames = ["CW_fp_add.v", "CW_fp_mult.v"]
+    dirname = "peak_core"
+    result_filenames = []
+    for name in filenames:
+        filename = os.path.join(dirname, name)
+        assert os.path.isfile(filename)
+        result_filenames.append(filename)
+    return result_filenames
 
 
 @pytest.mark.parametrize("batch_size", [100])
-def test_interconnect_point_wise(batch_size: int):
+@pytest.mark.parametrize("add_pd", [True, False])
+def test_interconnect_point_wise(batch_size: int, cw_files, add_pd):
     # we test a simple point-wise multiplier function
     # to account for different CGRA size, we feed in data to the very top-left
     # SB and route through horizontally to reach very top-right SB
     # we configure the top-left PE as multiplier
     chip_size = 2
-    interconnect = create_cgra(chip_size, add_io=True)
+    interconnect = create_cgra(chip_size, add_io=True, add_pd=add_pd)
 
-    config_data = []
+    netlist = {
+        "e0": [("I0", "io2f_16"), ("P0", "data0")],
+        "e1": [("I1", "io2f_16"), ("P0", "data1")],
+        "e3": [("P0", "alu_res"), ("I2", "f2io_16")],
+    }
+    bus = {"e0": 16, "e1": 16, "e3": 16}
 
-    graph_16 = interconnect.get_graph(16)
-    sb_data0 = graph_16[1, 1].get_sb(SwitchBoxSide.WEST,
-                                     0,
-                                     SwitchBoxIO.SB_IN)
-    sb_data1 = graph_16[1, 1].get_sb(SwitchBoxSide.NORTH,
-                                     0,
-                                     SwitchBoxIO.SB_IN)
-    port_data0 = graph_16[1, 1].ports["data0"]
-    port_data1 = graph_16[1, 1].ports["data1"]
-    config_data.append(interconnect.get_node_bitstream_config(sb_data0,
-                                                              port_data0))
-    config_data.append(interconnect.get_node_bitstream_config(sb_data1,
-                                                              port_data1))
-    output_port = graph_16[1, 1].ports["res"]
-    output_sb = graph_16[1, 1].get_sb(SwitchBoxSide.EAST,
-                                      0,
-                                      SwitchBoxIO.SB_OUT)
-    config_data.append(interconnect.get_node_bitstream_config(output_port,
-                                                              output_sb))
+    placement, routing = pnr(interconnect, (netlist, bus))
+    config_data = interconnect.get_route_bitstream(routing)
 
-    next_node = None
-    # route all the way to the end
-    for x in range(2, chip_size + 1):
-        pre_node = graph_16[x, 1].get_sb(SwitchBoxSide.WEST,
-                                         0,
-                                         SwitchBoxIO.SB_IN)
-        next_node = graph_16[x, 1].get_sb(SwitchBoxSide.EAST,
-                                          0,
-                                          SwitchBoxIO.SB_OUT)
-        config = interconnect.get_node_bitstream_config(pre_node,
-                                                        next_node)
-        assert config is not None
-        config_data.append(config)
-
-    # config the top-left PE
-    config_data.append((0xFF000101, 0x000AF00B))
+    x, y = placement["P0"]
+    tile_id = x << 8 | y
+    tile = interconnect.tile_circuits[(x, y)]
+    add_bs = tile.core.configure(asm.umult0())
+    for addr, data in add_bs:
+        config_data.append(((addr << 24) | tile_id, data))
 
     circuit = interconnect.circuit()
 
@@ -74,10 +70,12 @@ def test_interconnect_point_wise(batch_size: int):
         tester.eval()
         tester.expect(circuit.read_config_data, index)
 
-    src_name0 = f"glb2io_X0_Y{sb_data0.y}"
-    src_name1 = f"glb2io_X{sb_data1.x}_Y0"
-    assert next_node is not None
-    dst_name = f"io2glb_X{next_node.x + 1}_Y{next_node.y}"
+    src_x0, src_y0 = placement["I0"]
+    src_x1, src_y1 = placement["I1"]
+    src_name0 = f"glb2io_X{src_x0}_Y{src_y0}"
+    src_name1 = f"glb2io_X{src_x1}_Y{src_y1}"
+    dst_x, dst_y = placement["I2"]
+    dst_name = f"io2glb_X{dst_x}_Y{dst_y}"
     random.seed(0)
     for _ in range(batch_size):
         num_1 = random.randrange(0, 256)
@@ -88,6 +86,7 @@ def test_interconnect_point_wise(batch_size: int):
         tester.eval()
         tester.expect(circuit.interface[dst_name], num_1 * num_2)
 
+<<<<<<< HEAD
     # with tempfile.TemporaryDirectory() as tempdir:
     tempdir = "tests/test_interconnect/build"
     for genesis_verilog in glob.glob("genesis_verif/*.*"):
@@ -99,56 +98,51 @@ def test_interconnect_point_wise(batch_size: int):
                            magma_output="coreir-verilog",
                            directory=tempdir,
                            flags=["-Wno-fatal --trace"])
+=======
+    with tempfile.TemporaryDirectory() as tempdir:
+        for genesis_verilog in glob.glob("genesis_verif/*.*"):
+            shutil.copy(genesis_verilog, tempdir)
+        for filename in cw_files:
+            shutil.copy(filename, tempdir)
+        shutil.copy(os.path.join("tests", "test_memory_core",
+                                 "sram_stub.v"),
+                    os.path.join(tempdir, "sram_512w_16b.v"))
+        tester.compile_and_run(target="verilator",
+                               magma_output="coreir-verilog",
+                               directory=tempdir,
+                               flags=["-Wno-fatal", "--trace"])
+>>>>>>> origin/master
 
 
-def test_interconnect_line_buffer():
+@pytest.mark.parametrize("add_pd", [True, False])
+def test_interconnect_line_buffer(cw_files, add_pd):
     chip_size = 2
     depth = 10
-    interconnect = create_cgra(chip_size, add_io=True)
-    config_data = []
+    interconnect = create_cgra(chip_size, add_io=True, add_pd=add_pd)
 
-    graph16 = interconnect.get_graph(16)
-    graph1 = interconnect.get_graph(1)
-    input_node = graph16.get_sb(2, 1, SwitchBoxSide.EAST, 0, SwitchBoxIO.SB_IN)
-    mem_in = graph16.get_port(2, 1, "data_in")
-    mem_out = graph16.get_port(2, 1, "data_out")
-    config_data.append(interconnect.get_node_bitstream_config(input_node,
-                                                              mem_in))
-    next_node0 = graph16.get_sb(2, 1, SwitchBoxSide.WEST, 0, SwitchBoxIO.SB_OUT)
-    config_data.append(interconnect.get_node_bitstream_config(input_node,
-                                                              next_node0))
-    # route the line buffer output to the track 1
-    next_node1 = graph16.get_sb(2, 1, SwitchBoxSide.WEST, 1, SwitchBoxIO.SB_OUT)
-    config_data.append(interconnect.get_node_bitstream_config(mem_out,
-                                                              next_node1))
-    # route the result to the input
-    next_node0 = graph16.get_sb(1, 1, SwitchBoxSide.EAST, 0, SwitchBoxIO.SB_IN)
-    # to data 0
-    data0 = graph16.get_port(1, 1, "data0")
-    config_data.append(interconnect.get_node_bitstream_config(next_node0,
-                                                              data0))
-    next_node1 = graph16.get_sb(1, 1, SwitchBoxSide.EAST, 1, SwitchBoxIO.SB_IN)
-    data1 = graph16.get_port(1, 1, "data1")
-    config_data.append(interconnect.get_node_bitstream_config(next_node1,
-                                                              data1))
+    netlist = {
+        "e0": [("I0", "io2f_16"), ("m0", "data_in"), ("P0", "data0")],
+        "e1": [("m0", "data_out"), ("P0", "data1")],
+        "e3": [("P0", "alu_res"), ("I1", "f2io_16")],
+        "e4": [("i0", "io2f_1"), ("m0", "wen_in")]
+    }
+    bus = {"e0": 16, "e1": 16, "e3": 16, "e4": 1}
 
-    # route the pe out to the (1, 1) left sb T0
-    data_out = graph16.get_port(1, 1, "res")
-    output_node = graph16.get_sb(1, 1, SwitchBoxSide.WEST, 0,
-                                 SwitchBoxIO.SB_OUT)
-    config_data.append(interconnect.get_node_bitstream_config(data_out,
-                                                              output_node))
+    placement, routing = pnr(interconnect, (netlist, bus))
+    config_data = interconnect.get_route_bitstream(routing)
 
-    # in this case we configure (2, 1) as line buffer mode
-    config_data.append((0x00000201, 0x00000004 | (depth << 3)))
-    # then (1, 1) is configured as add
-    config_data.append((0xFF000101, 0x000AF000))
+    # in this case we configure m0 as line buffer mode
+    mem_x, mem_y = placement["m0"]
+    config_data.append((0x00000000 | (mem_x << 8 | mem_y),
+                        0x00000004 | (depth << 3)))
+    # then p0 is configured as add
+    pe_x, pe_y = placement["P0"]
+    tile_id = pe_x << 8 | pe_y
+    tile = interconnect.tile_circuits[(pe_x, pe_y)]
 
-    # also need to wire a constant 1 to wen
-    wen_sb = graph1.get_sb(2, 1, SwitchBoxSide.NORTH, 1, SwitchBoxIO.SB_IN)
-    wen_port = graph1.get_port(2, 1, "wen_in")
-    config_data.append(interconnect.get_node_bitstream_config(wen_sb,
-                                                              wen_port))
+    add_bs = tile.core.configure(asm.add())
+    for addr, data in add_bs:
+        config_data.append(((addr << 24) | tile_id, data))
 
     circuit = interconnect.circuit()
 
@@ -160,9 +154,12 @@ def test_interconnect_line_buffer():
         tester.eval()
         tester.expect(circuit.read_config_data, index)
 
-    src = f"glb2io_X{input_node.x + 1}_Y{input_node.y}"
-    dst = f"io2glb_X{output_node.x - 1}_Y{output_node.y}"
-    wen = f"glb2io_X{wen_sb.x}_Y{wen_sb.y - 1}"
+    src_x, src_y = placement["I0"]
+    src = f"glb2io_X{src_x}_Y{src_y}"
+    dst_x, dst_y = placement["I1"]
+    dst = f"io2glb_X{dst_x}_Y{dst_y}"
+    wen_x, wen_y = placement["i0"]
+    wen = f"glb2io_X{wen_x}_Y{wen_y}"
 
     tester.poke(circuit.interface[wen], 1)
 
@@ -176,6 +173,7 @@ def test_interconnect_line_buffer():
         # toggle the clock
         tester.step(2)
 
+<<<<<<< HEAD
     # with tempfile.TemporaryDirectory() as tempdir:
     tempdir = "tests/test_interconnect/build"
     print(str(tempdir))
@@ -188,45 +186,48 @@ def test_interconnect_line_buffer():
                            magma_output="coreir-verilog",
                            directory=tempdir,
                            flags=["-Wno-fatal --trace"])
+=======
+    with tempfile.TemporaryDirectory() as tempdir:
+        for genesis_verilog in glob.glob("genesis_verif/*.*"):
+            shutil.copy(genesis_verilog, tempdir)
+        for filename in cw_files:
+            shutil.copy(filename, tempdir)
+        shutil.copy(os.path.join("tests", "test_memory_core",
+                                 "sram_stub.v"),
+                    os.path.join(tempdir, "sram_512w_16b.v"))
+        tester.compile_and_run(target="verilator",
+                               magma_output="coreir-verilog",
+                               directory=tempdir,
+                               flags=["-Wno-fatal"])
+>>>>>>> origin/master
 
 
-def test_interconnect_sram():
+@pytest.mark.parametrize("add_pd", [True, False])
+def test_interconnect_sram(cw_files, add_pd):
     chip_size = 2
-    interconnect = create_cgra(chip_size, add_io=True)
-    config_data = []
+    interconnect = create_cgra(chip_size, add_io=True, add_pd=add_pd)
 
-    graph16 = interconnect.get_graph(16)
-    graph1 = interconnect.get_graph(1)
-    input_node = graph16.get_sb(2, 1, SwitchBoxSide.EAST, 0, SwitchBoxIO.SB_IN)
-    mem_in = graph16.get_port(2, 1, "addr_in")
-    mem_out = graph16.get_port(2, 1, "data_out")
-    config_data.append(interconnect.get_node_bitstream_config(input_node,
-                                                              mem_in))
-    next_node0 = graph16.get_sb(2, 1, SwitchBoxSide.WEST, 0, SwitchBoxIO.SB_OUT)
-    config_data.append(interconnect.get_node_bitstream_config(mem_out,
-                                                              next_node0))
-    # route the result to left PE
-    next_node0 = graph16.get_sb(1, 1, SwitchBoxSide.EAST, 0, SwitchBoxIO.SB_IN)
-    # route to the (0, 0) left sb T0
-    output_node = graph16.get_sb(1, 1, SwitchBoxSide.WEST, 0,
-                                 SwitchBoxIO.SB_OUT)
-    config_data.append(interconnect.get_node_bitstream_config(next_node0,
-                                                              output_node))
+    netlist = {
+        "e0": [("I0", "io2f_16"), ("m0", "addr_in")],
+        "e1": [("m0", "data_out"), ("I1", "f2io_16")],
+        "e2": [("i0", "io2f_1"), ("m0", "ren_in")]
+    }
+    bus = {"e0": 16, "e1": 16, "e2": 1}
 
+    placement, routing = pnr(interconnect, (netlist, bus))
+    config_data = interconnect.get_route_bitstream(routing)
+
+    x, y = placement["m0"]
+    sram_config_addr = 0x00000000 | (x << 8 | y)
     # in this case we configure (1, 0) as sram mode
-    config_data.append((0x00000201, 0x00000006))
+    config_data.append((sram_config_addr, 0x00000006))
 
-    # also need to wire a constant 1 to ren
-    ren_sb = graph1.get_sb(2, 1, SwitchBoxSide.NORTH, 1, SwitchBoxIO.SB_IN)
-    ren_port = graph1.get_port(2, 1, "ren_in")
-    config_data.append(interconnect.get_node_bitstream_config(ren_sb,
-                                                              ren_port))
     sram_data = []
     # add SRAM data
     for i in range(0, 1024, 4):
         feat_addr = i // 256 + 1
         mem_addr = i % 256
-        sram_data.append((0x00000201 | mem_addr << 24 | feat_addr << 16,
+        sram_data.append((sram_config_addr | mem_addr << 24 | feat_addr << 16,
                           i + 10))
 
     circuit = interconnect.circuit()
@@ -246,9 +247,12 @@ def test_interconnect_sram():
         # tester.eval()
         # tester.expect(circuit.read_config_data, data)
 
-    src = f"glb2io_X{input_node.x + 1}_Y{input_node.y}"
-    dst = f"io2glb_X{output_node.x - 1}_Y{output_node.y}"
-    ren = f"glb2io_X{ren_sb.x}_Y{ren_sb.y - 1}"
+    addr_x, addr_y = placement["I0"]
+    src = f"glb2io_X{addr_x}_Y{addr_y}"
+    dst_x, dst_y = placement["I1"]
+    dst = f"io2glb_X{dst_x}_Y{dst_y}"
+    ren_x, ren_y = placement["i0"]
+    ren = f"glb2io_X{ren_x}_Y{ren_y}"
 
     tester.step(2)
     tester.poke(circuit.interface[ren], 1)
@@ -261,6 +265,7 @@ def test_interconnect_sram():
         tester.eval()
         tester.expect(circuit.interface[dst], i + 10)
 
+<<<<<<< HEAD
     tempdir = "tests/test_interconnect/build"
     for genesis_verilog in glob.glob("genesis_verif/*.*"):
         shutil.copy(genesis_verilog, tempdir)
@@ -271,11 +276,26 @@ def test_interconnect_sram():
                            magma_output="coreir-verilog",
                            directory=tempdir,
                            flags=["-Wno-fatal --trace"])
+=======
+    with tempfile.TemporaryDirectory() as tempdir:
+        for genesis_verilog in glob.glob("genesis_verif/*.*"):
+            shutil.copy(genesis_verilog, tempdir)
+        for filename in cw_files:
+            shutil.copy(filename, tempdir)
+        shutil.copy(os.path.join("tests", "test_memory_core",
+                                 "sram_stub.v"),
+                    os.path.join(tempdir, "sram_512w_16b.v"))
+        tester.compile_and_run(target="verilator",
+                               magma_output="coreir-verilog",
+                               directory=tempdir,
+                               flags=["-Wno-fatal"])
+>>>>>>> origin/master
 
 
-def create_cgra(chip_size: int, add_io: bool = False):
+def create_cgra(chip_size: int, add_io: bool = False,
+                num_tracks: int = 3,
+                add_pd: bool = True):
     # currently only add 16bit io cores
-    num_tracks = 2
     reg_mode = True
     addr_width = 8
     data_width = 32
@@ -283,6 +303,8 @@ def create_cgra(chip_size: int, add_io: bool = False):
     tile_id_width = 16
     track_length = 1
     margin = 0 if not add_io else 1
+    sides = (IOSide.North | IOSide.East | IOSide.South | IOSide.West) \
+        if add_io else IOSide.None_
     chip_size += 2 * margin
     # recalculate the margin
     # creates all the cores here
@@ -313,8 +335,13 @@ def create_cgra(chip_size: int, add_io: bool = False):
                 else:
                     core = IO1bit()
             else:
+<<<<<<< HEAD
                 core = MemCore(64, 16, 512, 2) if ((x - margin) % 2 == 1) else \
                     PECore()
+=======
+                core = MemCore(16, 1024) if ((x - margin) % 2 == 1) else \
+                    PeakCore(gen_pe)
+>>>>>>> origin/master
             cores[(x, y)] = core
 
     def create_core(xx: int, yy: int):
@@ -322,8 +349,8 @@ def create_cgra(chip_size: int, add_io: bool = False):
 
     # specify input and output port connections
     inputs = ["data0", "data1", "bit0", "bit1", "bit2", "data_in",
-              "addr_in", "flush", "ren_in", "wen_in"]
-    outputs = ["res", "res_p", "data_out"]
+              "addr_in", "flush", "ren_in", "wen_in", "clk_en"]
+    outputs = ["alu_res", "alu_res_p", "data_out"]
     # this is slightly different from the chip we tape out
     # here we connect input to every SB_IN and output to every SB_OUT
     port_conns = {}
@@ -358,17 +385,15 @@ def create_cgra(chip_size: int, add_io: bool = False):
                                          {track_length: num_tracks},
                                          SwitchBoxType.Disjoint,
                                          pipeline_regs,
-                                         margin=margin,
+                                         io_sides=sides,
                                          io_conn=io_conn)
         ics[bit_width] = ic
 
     lift_ports = margin == 0
     interconnect = Interconnect(ics, addr_width, data_width, tile_id_width,
                                 lift_ports=lift_ports)
+    if add_pd:
+        add_power_domain(interconnect)
     interconnect.finalize()
-    apply_global_meso_wiring(interconnect, margin=margin)
+    apply_global_meso_wiring(interconnect, io_sides=sides)
     return interconnect
-
-
-if __name__ == "__main__":
-    test_interconnect_point_wise(20)
