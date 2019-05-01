@@ -8,6 +8,7 @@ from gemstone.generator.from_magma import FromMagma
 from gemstone.generator.from_verilog import FromVerilog
 from memory_core import memory_core_genesis2
 from typing import List
+import coreir
 
 class MemCore(ConfigurableCore):
     def __init__(self, data_width, word_width, data_depth, num_banks):
@@ -31,7 +32,7 @@ class MemCore(ConfigurableCore):
             stall=magma.In(magma.Bits[4]),
             config_en_db=magma.In(TBit),
             switch_db=magma.In(TBit),
-
+            clk_in=magma.In(magma.Clock),
             config_en_fifo=magma.In(TBit),
             config_en_linebuf=magma.In(TBit),
             # chain_wen_in=magma.In(TBit),
@@ -57,6 +58,7 @@ class MemCore(ConfigurableCore):
         self.wire(self.ports.addr_in, self.underlying.ports.addr_in)
         self.wire(self.ports.data_out, self.underlying.ports.data_out)
         self.wire(self.ports.reset, self.underlying.ports.reset)
+        self.wire(self.ports.clk_in, self.underlying.ports.clk_in)
         self.wire(self.ports.flush[0], self.underlying.ports.flush)
         self.wire(self.ports.wen_in[0], self.underlying.ports.wen_in)
         self.wire(self.ports.ren_in[0], self.underlying.ports.ren_in)
@@ -64,9 +66,6 @@ class MemCore(ConfigurableCore):
         self.wire(self.ports.switch_db[0], self.underlying.ports.switch_db)
         self.wire(self.ports.config_en_fifo[0], self.underlying.ports.config_en_fifo)
         self.wire(self.ports.config_en_linebuf[0], self.underlying.ports.config_en_linebuf)
-        # self.wire(self.ports.chain_wen[0], self.underlying.ports.chain_wen)
-        # self.wire(self.ports.chain_in, self.underlying.ports.chain_in)
-        # self.wire(self.ports.config_read[0], self.underlying.ports.config_read)
         self.wire(self.ports.config_write[0], self.underlying.ports.config_write)
 
         # PE core uses clk_en (essentially active low stall)
@@ -74,17 +73,12 @@ class MemCore(ConfigurableCore):
         self.wire(self.stallInverter.ports.I, self.ports.stall[0:1])
         self.wire(self.stallInverter.ports.O[0], self.underlying.ports.clk_en)
 
-        # TODO(rsetaluri): Actually wire these inputs.
         zero_signals = (
-            # ("config_en_fifo", 1),
-            # ("config_en_linebuf", 1),
-            # ("config_en_db", 1),
              ("chain_wen_in", 1),
              ("chain_in", self.word_width),
         )
         one_signals = (
              ("config_read", 1),
-        #     ("config_write", 1),
         )
         # enable read and write by default
         for name, width in zero_signals:
@@ -157,8 +151,14 @@ class MemCore(ConfigurableCore):
                 self.ports[f"config_en_{sram_index}"]
             self.wire(self.underlying.ports["config_en_sram"][sram_index],
                       self.ports[f"config_en_{sram_index}"])
+#            self.wire(self.ports[f"config_en_{sram_index}"] , self.underlying.ports["config_en_sram"][sram_index])
 
-    def configure(self, instr):
+       # self.wire(self.ports.config_en_0 , self.underlying.ports.config_en_sram[0])
+       # self.wire(self.ports.config_en_1 , self.underlying.ports.config_en_sram[1])
+       # self.wire(self.ports.config_en_2 , self.underlying.ports.config_en_sram[2])
+       # self.wire(self.ports.config_en_3 , self.underlying.ports.config_en_sram[3])
+
+    def get_config_bitstream(self, instr):
         raise NotImplementedError()
 
     def instruction_type(self):
@@ -176,6 +176,8 @@ class MemCore(ConfigurableCore):
 
     def name(self):
         return "MemCore"
+
+
 
     def pnr_info(self):
         return PnRTag("m", self.DEFAULT_PRIORITY, self.DEFAULT_PRIORITY - 1)
