@@ -85,7 +85,6 @@ def test_interconnect_point_wise(batch_size: int, cw_files, add_pd):
         tester.eval()
         tester.expect(circuit.interface[dst_name], num_1 * num_2)
 
-<<<<<<< HEAD
     # with tempfile.TemporaryDirectory() as tempdir:
     tempdir = "tests/test_interconnect/build"
     for genesis_verilog in glob.glob("genesis_verif/*.*"):
@@ -97,20 +96,7 @@ def test_interconnect_point_wise(batch_size: int, cw_files, add_pd):
                            magma_output="coreir-verilog",
                            directory=tempdir,
                            flags=["-Wno-fatal --trace"])
-=======
-    with tempfile.TemporaryDirectory() as tempdir:
-        for genesis_verilog in glob.glob("genesis_verif/*.*"):
-            shutil.copy(genesis_verilog, tempdir)
-        for filename in cw_files:
-            shutil.copy(filename, tempdir)
-        shutil.copy(os.path.join("tests", "test_memory_core",
-                                 "sram_stub.v"),
-                    os.path.join(tempdir, "sram_512w_16b.v"))
-        tester.compile_and_run(target="verilator",
-                               magma_output="coreir-verilog",
-                               directory=tempdir,
-                               flags=["-Wno-fatal", "--trace"])
->>>>>>> origin/master
+
 
 
 @pytest.mark.parametrize("add_pd", [True, False])
@@ -174,7 +160,6 @@ def test_interconnect_line_buffer(cw_files, add_pd):
         # toggle the clock
         tester.step(2)
 
-<<<<<<< HEAD
     # with tempfile.TemporaryDirectory() as tempdir:
     tempdir = "tests/test_interconnect/build"
     print(str(tempdir))
@@ -187,20 +172,7 @@ def test_interconnect_line_buffer(cw_files, add_pd):
                            magma_output="coreir-verilog",
                            directory=tempdir,
                            flags=["-Wno-fatal --trace"])
-=======
-    with tempfile.TemporaryDirectory() as tempdir:
-        for genesis_verilog in glob.glob("genesis_verif/*.*"):
-            shutil.copy(genesis_verilog, tempdir)
-        for filename in cw_files:
-            shutil.copy(filename, tempdir)
-        shutil.copy(os.path.join("tests", "test_memory_core",
-                                 "sram_stub.v"),
-                    os.path.join(tempdir, "sram_512w_16b.v"))
-        tester.compile_and_run(target="verilator",
-                               magma_output="coreir-verilog",
-                               directory=tempdir,
-                               flags=["-Wno-fatal"])
->>>>>>> origin/master
+
 
 
 @pytest.mark.parametrize("add_pd", [True, False])
@@ -266,7 +238,6 @@ def test_interconnect_sram(cw_files, add_pd):
         tester.eval()
         tester.expect(circuit.interface[dst], i + 10)
 
-<<<<<<< HEAD
     tempdir = "tests/test_interconnect/build"
     for genesis_verilog in glob.glob("genesis_verif/*.*"):
         shutil.copy(genesis_verilog, tempdir)
@@ -277,20 +248,7 @@ def test_interconnect_sram(cw_files, add_pd):
                            magma_output="coreir-verilog",
                            directory=tempdir,
                            flags=["-Wno-fatal --trace"])
-=======
-    with tempfile.TemporaryDirectory() as tempdir:
-        for genesis_verilog in glob.glob("genesis_verif/*.*"):
-            shutil.copy(genesis_verilog, tempdir)
-        for filename in cw_files:
-            shutil.copy(filename, tempdir)
-        shutil.copy(os.path.join("tests", "test_memory_core",
-                                 "sram_stub.v"),
-                    os.path.join(tempdir, "sram_512w_16b.v"))
-        tester.compile_and_run(target="verilator",
-                               magma_output="coreir-verilog",
-                               directory=tempdir,
-                               flags=["-Wno-fatal"])
->>>>>>> origin/master
+
 
 
 def create_cgra(chip_size: int, add_io: bool = False,
@@ -333,13 +291,8 @@ def create_cgra(chip_size: int, add_io: bool = False,
                     or y in range(chip_size - margin, chip_size):
                 core = IOCore()
             else:
-<<<<<<< HEAD
                 core = MemCore(64, 16, 512, 2) if ((x - margin) % 2 == 1) else \
-                    PECore()
-=======
-                core = MemCore(16, 1024) if ((x - margin) % 2 == 1) else \
                     PeakCore(gen_pe)
->>>>>>> origin/master
             cores[(x, y)] = core
 
     def create_core(xx: int, yy: int):
