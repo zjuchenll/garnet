@@ -28,7 +28,17 @@ class MemCore(ConfigurableCore):
             flush=magma.In(TBit),
             wen_in=magma.In(TBit),
             ren_in=magma.In(TBit),
-            stall=magma.In(magma.Bits[4])
+            stall=magma.In(magma.Bits[4]),
+            config_en_db=magma.In(TBit),
+            switch_db=magma.In(TBit),
+
+            config_en_fifo=magma.In(TBit),
+            config_en_linebuf=magma.In(TBit),
+            # chain_wen_in=magma.In(TBit),
+            # chain_in=magma.In(TData),
+            # config_read=magma.In(TBit),
+            config_write=magma.In(TBit)
+
         )
         # Instead of a single read_config_data, we have multiple for each
         # "sub"-feature of this core.
@@ -50,6 +60,14 @@ class MemCore(ConfigurableCore):
         self.wire(self.ports.flush[0], self.underlying.ports.flush)
         self.wire(self.ports.wen_in[0], self.underlying.ports.wen_in)
         self.wire(self.ports.ren_in[0], self.underlying.ports.ren_in)
+        self.wire(self.ports.config_en_db[0], self.underlying.ports.config_en_db)
+        self.wire(self.ports.switch_db[0], self.underlying.ports.switch_db)
+        self.wire(self.ports.config_en_fifo[0], self.underlying.ports.config_en_fifo)
+        self.wire(self.ports.config_en_linebuf[0], self.underlying.ports.config_en_linebuf)
+        # self.wire(self.ports.chain_wen[0], self.underlying.ports.chain_wen)
+        # self.wire(self.ports.chain_in, self.underlying.ports.chain_in)
+        # self.wire(self.ports.config_read[0], self.underlying.ports.config_read)
+        self.wire(self.ports.config_write[0], self.underlying.ports.config_write)
 
         # PE core uses clk_en (essentially active low stall)
         self.stallInverter = FromMagma(mantle.DefineInvert(1))
@@ -58,14 +76,15 @@ class MemCore(ConfigurableCore):
 
         # TODO(rsetaluri): Actually wire these inputs.
         zero_signals = (
-            ("config_en_fifo", 1),
-            ("config_en_linebuf", 1),
-            ("chain_wen_in", 1),
-            ("chain_in", self.word_width),
+            # ("config_en_fifo", 1),
+            # ("config_en_linebuf", 1),
+            # ("config_en_db", 1),
+             ("chain_wen_in", 1),
+             ("chain_in", self.word_width),
         )
         one_signals = (
-            ("config_read", 1),
-            ("config_write", 1),
+             ("config_read", 1),
+        #     ("config_write", 1),
         )
         # enable read and write by default
         for name, width in zero_signals:
@@ -81,7 +100,7 @@ class MemCore(ConfigurableCore):
         # TODO ADD FEATURES (mstrange)
         # we have six features in total
         # 0:   LINEBUF
-	
+
         # 1-4: SMEM
         # current setup is already in line buffer mode, so we pass self in
         # notice that config_en_linebuf is to change the address in the

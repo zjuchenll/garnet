@@ -26,7 +26,6 @@ module `mname()`(
    wen,
    data_in,
    data_out,
-   addr_in,
 
    doublebuffer_data_in,
    doublebuffer_cen_mem,
@@ -67,13 +66,16 @@ input wire                   wen;
 input wire  [`$wwidth-1`:0]  data_in;
 output wire [`$wwidth-1`:0]  data_out;
 
-input wire  [`$awidth-1`:0]  addr_in; 
 
 output wire [`$wwidth-1`:0]  doublebuffer_data_in  [`$bbanks-1`:0];
 output wire [`$bbanks-1`:0]  doublebuffer_cen_mem;
 output wire [`$bbanks-1`:0]  doublebuffer_wen_mem;
 output wire [`$awidth-1`:0]  doublebuffer_addr_mem [`$bbanks-1`:0];
 input wire  [`$wwidth-1`:0]  doublebuffer_data_out [`$bbanks-1`:0];
+
+
+
+
 
 // Configuration
 input wire                   config_en;
@@ -96,58 +98,91 @@ assign ren = (depth_int > 0) ? (num_words_mem >= depth_int) : 0;
 
 reg ping_npong;
 
+reg [`$awidth-1`:0] read_addr;
+reg [`$awidth-1`:0] write_addr;
+
+wire [31:0] max_count [`$iterator_support-1`:0];
+reg [31:0] dim_counter [`$iterator_support-1`:0]; 
+
 // ==============================================
 // Configuration
 // ==============================================
-reg [`$dim_width`:0] dimensionality;
-reg [31:0] stride []
-reg [] order
-reg 
-//; for (my $idx = 0; $idx < $iterator_support; $idx++) {
-reg [31:0] `'stride_' . $idx`;
-//; }
-//; for (my $idx = 0; $idx < $iterator_support; $idx++) {
-reg [31:0] `'order_' . $idx`;
-//; }
-//; for (my $idx = 0; $idx < $iterator_support; $idx++) {
-reg [31:0] `'size_' . $idx`;
-//; }
+reg [`$dim_width`:0] dimensionality; 
+reg [31:0] stride [`$iterator_support-1`:0];
+reg [31:0] order [`$iterator_support-1`:0];
+reg [31:0] dimsize [`$iterator_support-1`:0];
+reg [31:0] jump [`$iterator_support-1`:0];
+reg        update [`$iterator_support-1`:0];
+
+reg [31:0] move;
 
 reg [31:0] offset;
-always @ (posedge clk) begin
-  offset <= 32'd25
+always @ (*) begin
+  offset = 32'd25; 
 end
 
 
 always @(*) begin
-    if (config_en) begin
-        if (config_wr) begin
-          case (config_addr)
-            offset: begin
-              
-            end
-          //; for (my $idx = 0; $idx < $iterator_support; $idx++) {
-            `3*$idx + 1`: begin
-              stride
-            end
-          //; }
-                fifo_config_en = config_en;
-                fifo_config_wr = config_wr;
-                fifo_config_addr = {29'b0,config_addr[2:0]};
-                fifo_config_wr_data = config_wr_data;
-          endcase
-        end
-        else begin
-          // line buffer only has one state register
-          config_rd_data = {19'b0 ,depth};
-        end
-    end
+
+// The max count for any iterator is the size(dim)/stride(dim)
+//; for (my $idx = 0; $idx < $iterator_support; $idx++) {
+  max_count[order[`$idx`]] = dimsize[order[`$idx`]] / (stride[order[`$idx`]]);
+//; }
+// Jump is the size of all inner dimensions multiplied
+//; for (my $idx = $iterator_support-1; $idx > 0; $idx--) {
+  jump[`$idx`] = (`$idx` < dimensionality) ? 
+  //; for (my $jdx = $idx-1; $jdx >= 0; $jdx--) {
+                dimsize[`$jdx`] *
+  //; }
+                  1 : 0;
+//; } 
+   jump[0] = 1;
+
+  // Data to memory is just data in
+//; for (my $idx = 0; $idx < $bbanks; $idx++) {
+  doublebuffer_data_in[`$idx`] = data_in;
+//; }
+
+//; for (my $idx = 0; $idx < $bbanks; $idx++) {
+  doublebuffer_cen_mem[`$idx`] = (wen | valid | switch);
+//; }
+//; for (my $idx = 0; $idx < $bbanks; $idx++) {
+  doublebuffer_wen_mem[`$idx`] = (ping_npong == `$idx`) & wen;
+//; }
+//; for (my $idx = 0; $idx < $bbanks; $idx++) {
+  doublebuffer_addr_mem[`$idx`] = (ping_npong == `$idx`) ? write_addr : read_addr;
+//; }
+  // select proper data
+  data_out = doublebuffer_data_out[~ping_npong];
+  
+  read_addr =
+  //; for (my $idx = $iterator_support - 1; $idx > 0; $idx--) {
+   ((`$idx` < dimensionality) ? (jump[order[`$idx`]] * dim_counter[order[`$idx`]] * stride[order[`$idx`]]) : 0) +
+  //; }
+    (jump[order[0]] * dim_counter[order[0]] * stride[order[0]]);
+
+  // Update iterator when the previous one will update and flow over
+//; for (my $idx = $iterator_support - 1; $idx > 0; $idx--) {
+  update[order[`$idx`]] = (((dim_counter[order[`$idx-1`]]+1) % max_count[order[`$idx-1`]]) == 0) & update[order[`$idx-1`]];
+//; }
+  // Innermost loop always updated
+  update[order[0]] = valid;
+
 end
 
 always @(posedge clk, posedge reset) begin
-  if (reset) begin  
+  if (reset) begin 
+  //; for (my $idx = 0; $idx < $iterator_support; $idx++) {
+    dim_counter[`$idx`] <= 0;
+  //; }
+  //; for (my $idx = 0; $idx < $iterator_support; $idx++) {
+    order[`$idx`] <= `$idx`;
+  //; }
     depth_int <= 0;
     valid <= 0;
+    ping_npong <= 0;
+    //read_addr <= 0;
+    write_addr <= 0;
   end
   else begin
     depth_int <= depth;
@@ -157,20 +192,68 @@ always @(posedge clk, posedge reset) begin
       // Config WRITE
       // =================================
       if (config_wr) begin
-      //; for (my $idx = 0; $idx < $iterator_support; $idx++) {
-        `3*$idx + 1`: begin
-          stride
-        end
-      //; }
+        case (config_addr)
+          0: begin
+            dimensionality <= config_wr_data;
+          end
+        //; for (my $idx = 0; $idx < $iterator_support; $idx++) {
+          `3*$idx + 1`: begin
+            stride[`$idx`] <= config_wr_data;
+          end
+          `3*$idx + 2`: begin
+            order[`$idx`] <= config_wr_data;
+          end
+          `3*$idx + 3`: begin
+            dimsize[`$idx`] <= config_wr_data;
+          end
+        //; }
+        endcase
       end
       // =================================
       // Config READ
       // =================================
       else begin
-
+        config_rd_data <= 0;
       end
     end
+  
+    // When we switch for the first time (and all times), the valid becomes 1 because good data is at the output
+    // Start over write and read addr, switch buffer (ping or pong)
+    // and kill counters
+    if(switch) begin // Or if configged to trigger on depth
+      ping_npong <= ~ping_npong;
+      valid <= 1'b1;
+      write_addr <= 0;
+      //read_addr <= 0;
+    //; for (my $idx = 0; $idx < $iterator_support; $idx++) {
+      dim_counter[`$idx`] <= 0;
+    //; }
+    end
+    else begin
+      // ===================
+      // ADDRS
+      // ===================
+
+      // Increment write_addr on wen
+      if (wen) begin
+        write_addr <= (write_addr + 1); 
+      end
+      // Once we expect data to start spilling out, we start moving the read_addr - move is based on counters
+      else if (valid) begin
+        //read_addr <= read_addr + move; 
+      //; for (my $idx = $iterator_support-1; $idx > 0; $idx--) {
+        dim_counter[order[`$idx`]] <= (update[order[`$idx`]]) ? ((dim_counter[order[`$idx`]] + 1) % max_count[order[`$idx`]]) : dim_counter[order[`$idx`]]; 
+      //; }
+        dim_counter[order[0]] <= (dim_counter[order[0]] + 1) % max_count[order[0]]; 
+      end
+    end
+  // else
   end
+// always  
 end
+
+
+// Combinational update of read addr
+
 
 endmodule

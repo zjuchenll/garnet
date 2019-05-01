@@ -40,9 +40,6 @@ class Garnet(Generator):
         cores = {}
         for x in range(width):
             for y in range(height):
-<<<<<<< HEAD
-                core = MemCore(64, 16, 512, 2) if (x % 2 == 1) else PECore()
-=======
                 # Empty corner.
                 if x in range(margin) and y in range(margin):
                     core = None
@@ -65,9 +62,8 @@ class Garnet(Generator):
                     else:
                         core = IO1bit()
                 else:
-                    core = MemCore(16, 1024) if ((x - margin) % 2 == 1) else \
+                    core = MemCore(64, 16, 512, 2) if ((x - margin) % 2 == 1) else \
                         PeakCore(gen_pe)
->>>>>>> origin/master
                 cores[(x, y)] = core
 
         def create_core(xx: int, yy: int):

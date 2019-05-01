@@ -12,7 +12,7 @@ class Mode(Enum):
     LINE_BUFFER = 0
     FIFO = 1
     SRAM = 2
-
+    DB = 3
 
 class Memory:
     def __init__(self, address_width, data_width):
