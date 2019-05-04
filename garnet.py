@@ -1,6 +1,5 @@
 import argparse
 import magma
-import coreir
 from canal.util import IOSide
 from gemstone.common.jtag_type import JTAGType
 from gemstone.generator.generator import Generator
@@ -12,13 +11,14 @@ from global_buffer.global_buffer_wire_signal import glb_glc_wiring, \
     glb_interconnect_wiring
 from global_buffer.mmio_type import MMIOType
 from canal.global_signal import GlobalSignalWiring
-from lassen.sim import gen_pe
 from cgra import create_cgra
-import metamapper
+from mapper import MapperWrapper
+from typing import Union
 import subprocess
 import os
 import math
 import archipelago
+import coreir
 
 
 class Garnet(Generator):
@@ -68,7 +68,6 @@ class Garnet(Generator):
                                    =GlobalSignalWiring.ParallelMeso,
                                    num_parallel_config=num_parallel_cfg,
                                    mem_ratio=(1, 4))
-        interconnect.dump_pnr("temp", "42")
         self.interconnect = interconnect
 
         self.add_ports(
@@ -92,37 +91,19 @@ class Garnet(Generator):
         glb_glc_wiring(self)
         glb_interconnect_wiring(self, width, num_parallel_cfg)
 
-        self.mapper_initalized = False
+        self.mapper: Union[MapperWrapper, None] = None
 
-    def initialize_mapper(self):
-        if self.mapper_initalized:
-            raise RuntimeError("Can not initialize mapper twice")
-        # Set up compiler and mapper.
         self.coreir_context = coreir.Context()
-        self.mapper = metamapper.PeakMapper(self.coreir_context, "lassen")
-        self.mapper.add_io_and_rewrite("io1", 1, "io2f_1", "f2io_1")
-        self.mapper.add_io_and_rewrite("io16", 16, "io2f_16", "f2io_16")
-        self.mapper.add_peak_primitive("PE", gen_pe)
 
-        # Hack to speed up rewrite rules discovery.
-        def bypass_mode(inst):
-            return (
-                inst.rega == type(inst.rega).BYPASS and
-                inst.regb == type(inst.regb).BYPASS and
-                inst.regd == type(inst.regd).BYPASS and
-                inst.rege == type(inst.rege).BYPASS and
-                inst.regf == type(inst.regf).BYPASS
-            )
-        self.mapper.add_discover_constraint(bypass_mode)
-
-        self.mapper.discover_peak_rewrite_rules(width=16)
-
-        self.mapper_initalized = True
+    def __initialize_mapper(self):
+        # Set up compiler and mapper.
+        self.mapper = MapperWrapper(self.coreir_context)
 
     def map(self, halide_src):
-        assert self.mapper_initalized
+        if self.mapper is None:
+            self.__initialize_mapper()
         app = self.coreir_context.load_from_file(halide_src)
-        instrs = self.mapper.map_app(app)
+        instrs = self.mapper.map(app)
         return app, instrs
 
     def run_pnr(self, info_file, mapped_file):
@@ -142,11 +123,10 @@ class Garnet(Generator):
         return result
 
     def convert_mapped_to_netlist(self, mapped):
+        print(mapped)
         raise NotImplemented()
 
     def compile(self, halide_src):
-        if not self.mapper_initalized:
-            self.initialize_mapper()
         mapped, instrs = self.map(halide_src)
         # id to name converts the id to instance name
         netlist, bus, id_to_name = self.convert_mapped_to_netlist(mapped)
@@ -165,8 +145,9 @@ def main():
     parser = argparse.ArgumentParser(description='Garnet CGRA')
     parser.add_argument('--width', type=int, default=4)
     parser.add_argument('--height', type=int, default=2)
-    parser.add_argument("--input-netlist", type=str, default="", dest="input")
-    parser.add_argument("--output-bitstream", type=str, default="",
+    parser.add_argument("-i", "--input-netlist", type=str, default="",
+                        dest="input")
+    parser.add_argument("-o", "--output-bitstream", type=str, default="",
                         dest="output")
     parser.add_argument("-v", "--verilog", action="store_true")
     parser.add_argument("--no-pd", "--no-power-domain", action="store_true")
