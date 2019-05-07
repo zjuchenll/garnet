@@ -2,7 +2,6 @@ from memory_core import memory_core_genesis2
 from memory_core.memory_core import gen_memory_core, Mode
 import glob
 import os
-import shutil
 import fault
 import random
 from hwtypes import BitVector
@@ -89,12 +88,6 @@ def test_sram_basic():
     generator = memory_core_genesis2.memory_core_wrapper.generator(
         param_mapping=memory_core_genesis2.param_mapping)
     Mem = generator()  # Using default params
-    for genesis_verilog in glob.glob("genesis_verif/*.v"):
-        shutil.copy(genesis_verilog, "tests/test_memory_core/build")
-
-    # FIXME: HACK from old CGRA, copy sram stub
-    shutil.copy("tests/test_memory_core/sram_stub.v",
-                "tests/test_memory_core/build/sram_512w_16b.v")
 
     # Setup functiona model
     DATA_DEPTH = 1024
@@ -149,7 +142,10 @@ def test_sram_basic():
         tester.read_and_write(addr, random.randint(0, (1 << 10)))
         tester.read(addr)
 
+    sram_stub_filename = os.path.join(os.path.dirname(__file__), "sram_stub.v")
+
     tester.compile_and_run(directory="tests/test_memory_core/build",
                            magma_output="verilog",
                            target="verilator",
+                           include_verilog_libraries=[sram_stub_filename],
                            flags=["-Wno-fatal"])
