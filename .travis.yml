@@ -50,7 +50,7 @@ script:
              --cov memory_core
              --ignore=filecmp.py
              --ignore=Genesis2/
-             -v --cov-report term-missing tests
+             -v -s --cov-report term-missing tests
 
 
 after_success:
