@@ -35,9 +35,6 @@ class MemCore(ConfigurableCore):
             clk_in=magma.In(magma.Clock),
             config_en_fifo=magma.In(TBit),
             config_en_linebuf=magma.In(TBit),
-            # chain_wen_in=magma.In(TBit),
-            # chain_in=magma.In(TData),
-            # config_read=magma.In(TBit),
             config_write=magma.In(TBit)
 
         )
@@ -151,12 +148,7 @@ class MemCore(ConfigurableCore):
                 self.ports[f"config_en_{sram_index}"]
             self.wire(self.underlying.ports["config_en_sram"][sram_index],
                       self.ports[f"config_en_{sram_index}"])
-#            self.wire(self.ports[f"config_en_{sram_index}"] , self.underlying.ports["config_en_sram"][sram_index])
 
-       # self.wire(self.ports.config_en_0 , self.underlying.ports.config_en_sram[0])
-       # self.wire(self.ports.config_en_1 , self.underlying.ports.config_en_sram[1])
-       # self.wire(self.ports.config_en_2 , self.underlying.ports.config_en_sram[2])
-       # self.wire(self.ports.config_en_3 , self.underlying.ports.config_en_sram[3])
 
     def get_config_bitstream(self, instr):
         raise NotImplementedError()
@@ -176,8 +168,6 @@ class MemCore(ConfigurableCore):
 
     def name(self):
         return "MemCore"
-
-
 
     def pnr_info(self):
         return PnRTag("m", self.DEFAULT_PRIORITY, self.DEFAULT_PRIORITY - 1)

@@ -6,7 +6,8 @@ from gemstone.common.generator_interface import GeneratorInterface
 interface = GeneratorInterface()\
     .register("cfg_bus_width", int, 32)\
     .register("cfg_addr_width", int, 32)\
-    .register("cfg_op_width", int, 5)
+    .register("cfg_op_width", int, 5)\
+    .register("soc_addr", int, 12)
 
 type_map = {
     "clk_in": magma.In(magma.Clock),
@@ -18,12 +19,12 @@ type_map = {
 }
 gc_wrapper = GenesisWrapper(interface,
                             "global_controller",
-                            ["global_controller/genesis/global_controller.vp",
+                            ["global_controller/genesis/global_controller.svp",
                              "global_controller/genesis/jtag.svp",
                              "global_controller/genesis/tap.svp",
                              "global_controller/genesis/flop.svp",
                              "global_controller/genesis/cfg_and_dbg.svp"],
-                            type_map=type_map)
+                            system_verilog=True, type_map=type_map)
 
 if __name__ == "__main__":
     """

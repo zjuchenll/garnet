@@ -30,7 +30,7 @@ module `mname()`(
    almost_full,
    empty,
    full,
-
+   depth,
    fifo_to_mem_data,
    fifo_to_mem_cen,
    fifo_to_mem_wen,
@@ -66,7 +66,7 @@ output wire [`$awidth-1`:0] fifo_to_mem_addr [`$bbanks-1`:0];
 input wire  [`$wwidth-1`:0] mem_to_fifo_data [`$bbanks-1`:0];
 
 output reg [12:0] num_words_mem;
-
+input wire [12:0] depth;
 // Config
 input wire config_en;
 input wire config_wr;
@@ -107,6 +107,8 @@ reg [`$awidth-1`:0] data_addr [`$bbanks-1`:0];
 
 reg init_stage;
 reg read_to_write;
+reg passthru;
+reg [`$wwidth-1`:0] passthru_reg;
 
 wire [`$bbanks-1`:0] wen_mem_en;
 reg [`$wwidth-1`:0] data_out_reg;
@@ -116,10 +118,11 @@ assign read_addr_mem = read_addr[`$full_addr-1`:`$bank_addr_width`];
 assign write_addr_mem = write_addr[`$full_addr-1`:`$bank_addr_width`];
 
 assign almost_empty = (num_words_mem <= 1);
-assign almost_full = (num_words_mem >= (2**(`$full_addr`) - 1));
+assign almost_full = (num_words_mem >= (depth - 1));
 
 assign empty = (num_words_mem == 0);
-assign full = (num_words_mem == (2**(`$full_addr`)));
+assign full = (num_words_mem == depth);
+
 
 wire [`$bbanks-1`:0] same_bank;
 
@@ -133,15 +136,15 @@ assign cen_mem[`$i`] = ren_mem[`$i`] | wen_mem_en[`$i`];
 // ================
 // Status signals
 // ================
-//; for(my $i = $bbanks-1; $i > 0; $i--) {
-	assign ren_mem[`$i`] = ren & ((read_addr[`$bank_addr_width-1`]));
+//; for(my $idx = $bbanks-1; $idx > 0; $idx--) {
+	assign ren_mem[`$idx`] = ren & ((read_addr[`$bank_addr_width-1`:0]) == `$idx`);
 //; }   
-	assign ren_mem[0] = ren & ((~read_addr[`$bank_addr_width-1`]) | init_stage);
+	assign ren_mem[0] = ren & ((read_addr[`$bank_addr_width-1`:0] == 0) | init_stage);
 
 //; for(my $i = $bbanks-1; $i > 0; $i--) {
-	assign wen_mem[`$i`] = wen & ((write_addr[`$bank_addr_width-1`]));
+	assign wen_mem[`$i`] = wen & ((write_addr[`$bank_addr_width-1`]) == `$i`);
 //; }
-	assign wen_mem[0] = wen & ((~write_addr[`$bank_addr_width-1`]) | init_stage);
+	assign wen_mem[0] = wen & ((write_addr[`$bank_addr_width-1`:0] == 0) | init_stage);
 
 //; for(my $i = 0; $i < $bbanks; $i++) {
 	assign wen_mem_en[`$i`] = (wen_mem[`$i`] & ~(same_bank[`$i`])) | write_buffed[`$i`];
@@ -183,11 +186,11 @@ always @(*) begin
 //; }
 
 	if (ren_mem_reg[0]) begin
-		data_out = data_out_sel[0];
+		data_out = (passthru) ? passthru_reg : data_out_sel[0];
 	end
 //; for(my $i = 1; $i < $bbanks; $i++) {
 	else if (ren_mem_reg[`$i`]) begin
-		data_out = data_out_sel[`$i`];
+		data_out = (passthru) ? passthru_reg : data_out_sel[`$i`];
 	end
 //; }
 	else begin
@@ -209,6 +212,8 @@ always @(posedge clk_gated or posedge reset) begin
 		read_to_write <= 1;
 		data_out_reg <= 0;
 		circular_en <= 0;
+    passthru <= 0;
+    passthru_reg <= 0;
 	//; for (my $i = 0; $i < $bbanks; $i++) {
 		write_buffed[`$i`] <= 0;
 		write_buff[`$i`] <= 0;
@@ -236,6 +241,8 @@ always @(posedge clk_gated or posedge reset) begin
 			read_to_write <= 1;
 			data_out_reg <= 0;
 			circular_en <= 0;
+      passthru <= 0;
+      passthru_reg <= 0;
 		//; for (my $i = 0; $i < $bbanks; $i++) {
 			write_buffed[`$i`] <= 0;
 			write_buff[`$i`] <= 0;
@@ -250,7 +257,7 @@ always @(posedge clk_gated or posedge reset) begin
 				write_buff[0] <= data_in;
 				write_buff_addr[0] <= write_addr_mem;
 			end
-		//; for (my $i = 0; $i < $bbanks; $i++) {
+		//; for (my $i = 1; $i < $bbanks; $i++) {
 			else if (same_bank[`$i`]) begin
 				write_buffed[`$i`] <= 1;
 				write_buff[`$i`] <= data_in;
@@ -265,8 +272,11 @@ always @(posedge clk_gated or posedge reset) begin
 		//; }
 			
 			// If READ AND NO WRITE
-			if (ren && ~wen) begin
-				if(circular_en) begin
+			if (ren & ~wen) begin
+        passthru <= 0;
+
+				if(circular_en & ~empty) begin
+
 					if ((read_addr + 1) % (2 ** `$full_addr`) == write_addr) begin
 						// circular buffer
 						read_addr <= 0;
@@ -277,29 +287,50 @@ always @(posedge clk_gated or posedge reset) begin
 						read_addr <= (read_addr + 1) % (2 ** `$full_addr`);
 						read_to_write <= 0;
 					end
+        // circular_en  
 				end
+
 				else begin
-					if (!empty) begin				
+
+					if (~empty) begin				
+
 						read_addr <= (read_addr + 1) % (2 ** `$full_addr`);
+
 						if ((read_addr + 1) % (2 ** `$full_addr`) == write_addr) begin
 							read_to_write <= 1;
 						end
 						else begin
 							read_to_write <= 0;
 						end			
+
 					end
+
+        // else begin
 				end
-			end
+
+      end
 			// If WRITE AND NO READ
-			else if (wen && ~ren) begin
+			else if (wen & ~ren) begin
+        passthru <= 0;
 				write_addr <= (write_addr + 1) % (2 ** `$full_addr`);
 				read_to_write <= 0;
 			end	
 			// If READ AND WRITE
-			else if (ren && wen) begin
+			else if (ren & wen) begin
+        if(empty & (|same_bank)) begin
+          passthru <= 1;
+          passthru_reg <= data_in;
+        end
+        else begin
+          passthru <= 0;
+        end
 				read_addr <= (read_addr + 1) % (2 ** `$full_addr`);
 				write_addr <= (write_addr + 1) % (2 ** `$full_addr`);
 			end
+      // No read or write - turn off passthru
+      else begin
+        passthru <= 0;
+      end
 			// Transition out of the init stage after a read or write
 			if (ren | wen) begin
 				init_stage <= 0;

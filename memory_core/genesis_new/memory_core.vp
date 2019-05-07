@@ -98,7 +98,8 @@ input [31:0] config_data;
 input config_read;
 input config_write;
 input config_en;
-input [`$num_sram_reads-1`:0] config_en_sram;
+//input [`$num_sram_reads-1`:0] config_en_sram;
+input [3:0] config_en_sram;
 input config_en_linebuf;
 input config_en_fifo;
 input config_en_db;
@@ -431,7 +432,7 @@ wire fifo_valid_out;
 .data_out(fifo_out),
 .almost_empty(fifo_almost_empty),
 .almost_full(fifo_almost_full),
-
+.depth(depth),
 .fifo_to_mem_data(fifo_mem_data_out),
 .fifo_to_mem_cen(fifo_cen),
 .fifo_to_mem_wen(fifo_wen),
@@ -468,6 +469,7 @@ wire db_valid_out;
 .reset(reset),
 .flush(flush),
 .wen(wen_in_int),
+.ren(ren_in),
 .data_in(data_in_int),
 .data_out(db_out),
 
