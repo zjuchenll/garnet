@@ -5,7 +5,7 @@
 //////////////////////////////////////////////////////////////////
 
 
-`$backtick`define xassert(condition, message) if(condition) begin $display(message); $finish(1); end
+//`$backtick`define xassert(condition, message) if(condition) begin $display(message); $finish(1); end
 
 
 //; my $dwidth   = parameter(Name=>'dwidth', val=> 16, doc=>'word width');
@@ -43,7 +43,7 @@ valid
   always @(posedge clk) begin
    // assert only wen_w2 or wen_w1 at a time.
    // asserting both is an error
-   `$backtick`xassert((wen_w2&wen_w1)==1'b1 , "both wen_w2 and wen_w1 are asserted" )
+   //`$backtick`xassert((wen_w2&wen_w1)==1'b1 , "both wen_w2 and wen_w1 are asserted" )
    if (fsm_en==1'b1) begin
      if (wen_w2==1'b1) begin
        data_sr <= {data_sr[`$dwidth - 1`:0],data_in};
@@ -63,18 +63,18 @@ valid
 	else if (fsm_en==1'b1) begin
       if (((wen_w1==1'b0) && (wen_w2==1'b0)) && ren==1'b1) begin
         count <= count - 2'd1;
-        `$backtick`xassert(count == 2'd0, "popping 1 pixel from output sr when count = 0")
+        //`$backtick`xassert(count == 2'd0, "popping 1 pixel from output sr when count = 0")
       end else if (wen_w1==1'b1 && ren==1'b0) begin
         count <= count + 2'd1;
-        `$backtick`xassert(count >= 2'd3, "pushing 1 pixel into output sr when count >= 3")
+        //`$backtick`xassert(count >= 2'd3, "pushing 1 pixel into output sr when count >= 3")
       end else if (wen_w2==1'b1 && ren==1'b0) begin
         count <= count + 2'd2;
-        `$backtick`xassert(count >= 2'd2, "pushing 2 pixels into output sr when count >= 2")
+        //`$backtick`xassert(count >= 2'd2, "pushing 2 pixels into output sr when count >= 2")
       end else if (wen_w1==1'b1 && ren==1'b1) begin
         count <= count;
       end else if (wen_w2==1'b1 && ren==1'b1) begin
         count <= count + 2'd1;
-        `$backtick`xassert(count >= 2'd3, "pushing 2 pixels into output sr when count >= 3")
+        //`$backtick`xassert(count >= 2'd3, "pushing 2 pixels into output sr when count >= 3")
       end
     end
   end

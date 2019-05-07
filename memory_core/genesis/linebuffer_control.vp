@@ -3,7 +3,7 @@
 ///////////////////////////////////////////////////////////////////
 // CGRA memory generator
 //////////////////////////////////////////////////////////////////
-`$backtick`define xassert(condition, message) if(condition) begin $display(message); $finish(1); end
+//`$backtick`define xassert(condition, message) if(condition) begin $display(message); $finish(1); end
 
 //; my $dwidth   = parameter(Name=>'dwidth', val=> 16, doc=>'word width');
 //; my $ddepth   = parameter(Name=>'ddepth', val=> 512, doc=>'number of words in the memory');

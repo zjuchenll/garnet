@@ -5,7 +5,7 @@
 //////////////////////////////////////////////////////////////////
 
 
-`$backtick`define xassert(condition, message) if(condition) begin $display(message); $finish(1); end
+//`$backtick`define xassert(condition, message) if(condition) begin $display(message); $finish(1); end
 
 
 //; my $dwidth   = parameter(Name=>'dwidth', val=> 16, doc=>'word width');
@@ -52,7 +52,7 @@ count
   always @(posedge clk) begin
    // assert only ren_w2 or ren_w1 at a time.
    // asserting both is an error
-   `$backtick`xassert((ren_w2&ren_w1)==1'b1 , "both ren_w2 and ren_w1 are asserted" )
+   //`$backtick`xassert((ren_w2&ren_w1)==1'b1 , "both ren_w2 and ren_w1 are asserted" )
   end
   always @(posedge clk or posedge reset) begin
     if (reset==1'b1) begin
@@ -64,16 +64,16 @@ count
     else if (fsm_en==1'b1) begin
       if (wen==1'b1 && (ren_w2==1'b0 && ren_w1==1'b0)) begin
         count <= count + 2'd1;
-        `$backtick`xassert(count >= 2'd3, "pushing data into sr when count >= 3")
+        //`$backtick`xassert(count >= 2'd3, "pushing data into sr when count >= 3")
       end else if (wen==1'b1 && ren_w2==1'b1) begin
         count <= count - 2'd1;
-        `$backtick`xassert(count == 2'd0, "popping pixel from sr when count == 0. Case A.")
+        //`$backtick`xassert(count == 2'd0, "popping pixel from sr when count == 0. Case A.")
       end else if (wen==1'b0 && ren_w2==1'b1) begin
         count <= count - 2'd2;
-        `$backtick`xassert(count <= 2'd1, "popping two pixels from sr when count <= 1")
+        //`$backtick`xassert(count <= 2'd1, "popping two pixels from sr when count <= 1")
       end else if (wen==1'b0 && ren_w1==1'b1) begin
         count <= count - 2'd1;
-        `$backtick`xassert(count == 2'd0, "popping pixel from sr when count ==0. Case B.")
+        //`$backtick`xassert(count == 2'd0, "popping pixel from sr when count ==0. Case B.")
       end else if (wen==1'b1 && ren_w1==1'b1) begin
         count <= count;
       end
