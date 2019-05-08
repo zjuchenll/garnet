@@ -45,7 +45,7 @@ class GlobalController(Generator):
         )
 
         wrapper = global_controller_genesis2.gc_wrapper
-        generator = wrapper.generator(mode="declare")
+        generator = wrapper.generator(mode="define")
         self.underlying = FromMagma(generator())
 
         self.wire(self.ports.jtag.tdi, self.underlying.ports.tdi)

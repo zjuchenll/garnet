@@ -9,6 +9,10 @@ interface = GeneratorInterface()\
     .register("cfg_op_width", int, 5)\
     .register("soc_addr", int, 12)
 
+
+DW_tap_stub = magma.DeclareCircuit("DW_tap")
+
+
 type_map = {
     "clk_in": magma.In(magma.Clock),
     "clk_out": magma.Out(magma.Clock),
@@ -17,6 +21,8 @@ type_map = {
     "reset_out": magma.Out(magma.AsyncReset),
     "trst_n": magma.In(magma.AsyncReset),
 }
+
+
 gc_wrapper = GenesisWrapper(interface,
                             "global_controller",
                             ["global_controller/genesis/global_controller.svp",
@@ -24,7 +30,8 @@ gc_wrapper = GenesisWrapper(interface,
                              "global_controller/genesis/tap.svp",
                              "global_controller/genesis/flop.svp",
                              "global_controller/genesis/cfg_and_dbg.svp"],
-                            system_verilog=True, type_map=type_map)
+                            system_verilog=True, type_map=type_map,
+                            external_modules={"DW_tap": DW_tap_stub})
 
 if __name__ == "__main__":
     """
