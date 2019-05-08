@@ -25,6 +25,7 @@ install:
     - pip install pytest
     - pip install python-coveralls
     - pip install pytest-cov pytest-codestyle
+    - pip install -e git+git://github.com/phanrahan/magma.git#egg=magma-lang
     # NOTE(rsetaluri): We no longer need to install this directory.
     #- pip install -e .
 
