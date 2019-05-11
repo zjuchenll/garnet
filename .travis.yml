@@ -47,6 +47,7 @@ script:
     - pytest --codestyle
              --cov global_controller
              --cov io_core
+             --cov collateral_pass
              --cov memory_core
              --ignore=filecmp.py
              --ignore=Genesis2/
