@@ -23,7 +23,7 @@ def run_verilator_regression(top, test_driver, genesis_params={},
         "CGRA_DATA_WIDTH": 16
     }
 ])
-def test_address_generator_verilator(verilog_params):
+def test_io_address_generator_verilator(verilog_params):
     test_driver = f"tests/test_global_buffer/verilator/"\
                   f"test_io_address_generator.cpp"
     res = run_verilator_regression("io_address_generator", test_driver,
