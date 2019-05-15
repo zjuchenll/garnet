@@ -1,15 +1,14 @@
 /*==============================================================================
 ** Module: test_addrgen_bank_interconnect.cpp
-** Description: Test driver for address generator interconnect
+** Description: Test driver for io controller
 ** Author: Taeyoung Kong
-** Change history: 05/11/2019 - Implement first version of address generator
-**                              interconnect test driver
+** Change history: 05/11/2019 - Implement first version 
 ** NOTE:    Word size is 16bit.
 **          Address should be word-aligned.
 **          This does not support unaligned access.
 **============================================================================*/
 
-#include "Vaddrgen_bank_interconnect.h"
+#include "Vio_controller.h"
 #include "verilated.h"
 #include "testbench.h"
 #include "time.h"
@@ -47,18 +46,18 @@ typedef enum REG_ID
     ID_SWITCH_SEL      = 5
 } REG_ID;
 
-class ADDR_GEN_INTER_TB : public TESTBENCH<Vaddrgen_bank_interconnect> {
+class IO_CTRL_TB : public TESTBENCH<Vio_controller> {
 public:
     uint8_t io_to_bank_rd_en_d1;
 
-    ADDR_GEN_INTER_TB(void) {
+    IO_CTRL_TB(void) {
         io_to_bank_rd_en_d1 = 0;
         io_to_bank_addr_d1 = 0;
         m_dut->glc_to_io_stall = 0;
         reset();
     }
 
-    ~ADDR_GEN_INTER_TB(void) {}
+    ~IO_CTRL_TB(void) {}
 
     void tick() {
         m_tickcount++;
@@ -321,9 +320,9 @@ int main(int argc, char **argv) {
 
     srand (time(NULL));
     // Instantiate address generator testbench
-    ADDR_GEN_INTER_TB *addr_gen_inter = new ADDR_GEN_INTER_TB();
-    addr_gen_inter->opentrace("trace_addr_gen_inter.vcd");
-    addr_gen_inter->reset();
+    IO_CTRL_TB *io_ctrl = new IO_CTRL_TB();
+    io_ctrl->opentrace("trace_io_ctrl.vcd");
+    io_ctrl->reset();
 
     // Create global buffer stub using array
     glb = new uint16_t[1<<(GLB_ADDR_WIDTH-1)];
@@ -332,6 +331,10 @@ int main(int argc, char **argv) {
     for (uint32_t i=0; i<(1<<(GLB_ADDR_WIDTH-1)); i++) {
             glb[i]= (uint16_t)rand();
     }
+
+    // config INSTREAM mode
+    io_ctrl->config_wr(0, ID_MODE, INSTREAM);
+
 
     // INSTREAM mode testing
     printf("\n");

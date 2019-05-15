@@ -1,5 +1,5 @@
 /*==============================================================================
-** Module: test_address_generator.cpp
+** Module: test_io_address_generator.cpp
 ** Description: Test driver for address generator
 ** Author: Taeyoung Kong
 ** Change history: 05/11/2019 - Implement first version of address generator
@@ -9,7 +9,7 @@
 **          This does not support unaligned access.
 **============================================================================*/
 
-#include "Vaddress_generator.h"
+#include "Vio_address_generator.h"
 #include "verilated.h"
 #include "testbench.h"
 #include "time.h"
@@ -35,7 +35,7 @@ typedef enum MODE
     SRAM        = 3
 } MODE;
 
-class ADDR_GEN_TB : public TESTBENCH<Vaddress_generator> {
+class ADDR_GEN_TB : public TESTBENCH<Vio_address_generator> {
 public:
     uint8_t io_to_bank_rd_en_d1;
     uint32_t io_to_bank_addr_d1;
